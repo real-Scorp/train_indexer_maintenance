@@ -1,0 +1,3663 @@
+
+================================================================================
+FILE: __init__.py
+================================================================================
+
+
+
+================================================================================
+FILE: code_concatenator.py
+================================================================================
+import os
+
+def concatenate_code_files(directory='.', output_file='combined_code.txt', 
+                            extensions=None, ignore_patterns=None):
+    """
+    Concatenate code files from a specified directory into a single file.
+    
+    :param directory: Directory to search for code files (default: current directory)
+    :param output_file: Name of the output file to write concatenated code
+    :param extensions: List of file extensions to include (e.g. ['.py', '.js'])
+    :param ignore_patterns: List of patterns to ignore in filenames
+    """
+    # Default extensions if not specified
+    if extensions is None:
+        extensions = ['.py', '.js', '.cpp', '.c', '.java', '.html', '.css', '.txt', 
+                      '.rb', '.php', '.go', '.rs', '.swift', '.kt', '.scala']
+    
+    # Default ignore patterns
+    if ignore_patterns is None:
+        ignore_patterns = ['venv', 'node_modules', '.git', '__pycache__', 
+                           'build', 'dist', '.env']
+
+    # Normalize directory path
+    directory = os.path.abspath(directory)
+    
+    # Prepare output file path
+    output_path = os.path.join(directory, output_file)
+    
+    # Collect all matching files
+    code_files = []
+    for root, dirs, files in os.walk(directory):
+        # Remove ignored directories
+        dirs[:] = [d for d in dirs if not any(ignore in d for ignore in ignore_patterns)]
+        
+        for file in files:
+            # Check file extension
+            if any(file.endswith(ext) for ext in extensions):
+                full_path = os.path.join(root, file)
+                
+                # Ignore files in ignored directories
+                if not any(ignore in full_path for ignore in ignore_patterns):
+                    code_files.append(full_path)
+    
+    # Sort files for consistent output
+    code_files.sort()
+    
+    # Write concatenated code
+    with open(output_path, 'w', encoding='utf-8') as outfile:
+        for filepath in code_files:
+            # Write separator with relative path
+            relative_path = os.path.relpath(filepath, directory)
+            outfile.write(f"\n{'='*80}\n")
+            outfile.write(f"FILE: {relative_path}\n")
+            outfile.write(f"{'='*80}\n")
+            
+            # Write file contents
+            try:
+                with open(filepath, 'r', encoding='utf-8') as infile:
+                    outfile.write(infile.read())
+                    outfile.write('\n\n')
+            except Exception as e:
+                outfile.write(f"\n[ERROR reading file: {e}]\n\n")
+    
+    print(f"Concatenated {len(code_files)} files into {output_file}")
+    print(f"Output file location: {output_path}")
+
+# Example usage
+if __name__ == '__main__':
+    # Basic usage
+    concatenate_code_files()
+    
+    # Custom usage examples:
+    # concatenate_code_files(directory='/path/to/your/project')
+    # concatenate_code_files(extensions=['.py', '.js'])
+    # concatenate_code_files(ignore_patterns=['test', 'docs'])
+
+
+================================================================================
+FILE: combined_code.txt
+================================================================================
+
+
+
+================================================================================
+FILE: data/__init__.py
+================================================================================
+
+
+
+================================================================================
+FILE: data/database_manager.py
+================================================================================
+# File: data/database_manager.py
+
+import sqlite3
+import os
+import pandas as pd
+from datetime import datetime
+
+class DatabaseManager:
+    """Handles database connections and operations for the expanded asset management system."""
+    
+    def __init__(self, db_path="./tul_maintenance.db"):
+        self.db_path = db_path
+        self.connection = None
+        
+    def connect(self):
+        """Establish connection to the SQLite database."""
+        try:
+            self.connection = sqlite3.connect(self.db_path)
+            return True
+        except sqlite3.Error as e:
+            print(f"Database connection error: {e}")
+            return False
+        
+    def create_tables(self):
+        """Create necessary tables if they don't exist."""
+        if not self.connection:
+            self.connect()
+            
+        try:
+            cursor = self.connection.cursor()
+            
+            # Create TULs table
+            cursor.execute('''
+            CREATE TABLE IF NOT EXISTS TULs (
+                TULID TEXT PRIMARY KEY,
+                Location TEXT,
+                InstallationDate DATE,
+                Notes TEXT
+            )
+            ''')
+            
+            # Create AssetTypes table
+            cursor.execute('''
+            CREATE TABLE IF NOT EXISTS AssetTypes (
+                AssetTypeID TEXT PRIMARY KEY,
+                Name TEXT,
+                Description TEXT,
+                WearThreshold REAL
+            )
+            ''')
+            
+            # Create Assets table
+            cursor.execute('''
+            CREATE TABLE IF NOT EXISTS Assets (
+                AssetID TEXT PRIMARY KEY,
+                TULID TEXT,
+                AssetTypeID TEXT,
+                InstanceNumber INTEGER,
+                InstallationDate DATE,
+                Notes TEXT,
+                FOREIGN KEY (TULID) REFERENCES TULs(TULID),
+                FOREIGN KEY (AssetTypeID) REFERENCES AssetTypes(AssetTypeID)
+            )
+            ''')
+            
+            # Create Measurements table
+            cursor.execute('''
+            CREATE TABLE IF NOT EXISTS Measurements (
+                MeasurementID INTEGER PRIMARY KEY AUTOINCREMENT,
+                AssetID TEXT,
+                MeasurementDate DATE,
+                WearValue REAL,
+                ShimsAdded REAL,
+                Notes TEXT,
+                FOREIGN KEY (AssetID) REFERENCES Assets(AssetID)
+            )
+            ''')
+            
+            # Add default asset types if they don't exist
+            cursor.execute("SELECT COUNT(*) FROM AssetTypes")
+            count = cursor.fetchone()[0]
+            
+            if count == 0:
+                # Insert default asset types
+                asset_types = [
+                    ("INDPIN", "Indexer Pinion", "Train indexer pinion gear", 60.0),
+                    ("INDROL", "Index Support Roller", "Support roller for the indexer system", 45.0)
+                ]
+                
+                cursor.executemany(
+                    "INSERT INTO AssetTypes (AssetTypeID, Name, Description, WearThreshold) VALUES (?, ?, ?, ?)",
+                    asset_types
+                )
+            
+            # Add default TULs if they don't exist
+            cursor.execute("SELECT COUNT(*) FROM TULs")
+            count = cursor.fetchone()[0]
+            
+            if count == 0:
+                # Insert default TULs
+                tuls = [
+                    ("TUL1", "Train Unloader 1", datetime.now().date(), ""),
+                    ("TUL2", "Train Unloader 2", datetime.now().date(), ""),
+                    ("TUL3", "Train Unloader 3", datetime.now().date(), "")
+                ]
+                
+                cursor.executemany(
+                    "INSERT INTO TULs (TULID, Location, InstallationDate, Notes) VALUES (?, ?, ?, ?)",
+                    tuls
+                )
+            
+            self.connection.commit()
+            return True
+        except sqlite3.Error as e:
+            print(f"Table creation error: {e}")
+            return False
+    
+    # Basic CRUD operations for TULs
+    def add_tul(self, tul_id, location, installation_date, notes=""):
+        """Add a new TUL to the database."""
+        if not self.connection:
+            self.connect()
+            
+        try:
+            cursor = self.connection.cursor()
+            cursor.execute(
+                "INSERT INTO TULs (TULID, Location, InstallationDate, Notes) VALUES (?, ?, ?, ?)",
+                (tul_id, location, installation_date, notes)
+            )
+            self.connection.commit()
+            return True
+        except sqlite3.Error as e:
+            print(f"Error adding TUL: {e}")
+            return False
+    
+    def get_tuls(self):
+        """Get all TULs from the database."""
+        if not self.connection:
+            self.connect()
+            
+        try:
+            cursor = self.connection.cursor()
+            cursor.execute("SELECT TULID, Location, InstallationDate, Notes FROM TULs ORDER BY TULID")
+            return cursor.fetchall()
+        except sqlite3.Error as e:
+            print(f"Error getting TULs: {e}")
+            return []
+    
+    def delete_tul(self, tul_id):
+        """Delete a TUL and all its associated assets and measurements."""
+        if not self.connection:
+            self.connect()
+            
+        try:
+            cursor = self.connection.cursor()
+            
+            # First get all assets for this TUL
+            cursor.execute("SELECT AssetID FROM Assets WHERE TULID = ?", (tul_id,))
+            assets = cursor.fetchall()
+            
+            # Delete all measurements for these assets
+            for asset in assets:
+                cursor.execute("DELETE FROM Measurements WHERE AssetID = ?", (asset[0],))
+            
+            # Delete all assets for this TUL
+            cursor.execute("DELETE FROM Assets WHERE TULID = ?", (tul_id,))
+            
+            # Finally delete the TUL
+            cursor.execute("DELETE FROM TULs WHERE TULID = ?", (tul_id,))
+            
+            self.connection.commit()
+            return True
+        except sqlite3.Error as e:
+            print(f"Error deleting TUL: {e}")
+            return False
+    
+    # Basic CRUD operations for Asset Types
+    def add_asset_type(self, type_id, name, description, wear_threshold):
+        """Add a new asset type to the database."""
+        if not self.connection:
+            self.connect()
+            
+        try:
+            cursor = self.connection.cursor()
+            cursor.execute(
+                "INSERT INTO AssetTypes (AssetTypeID, Name, Description, WearThreshold) VALUES (?, ?, ?, ?)",
+                (type_id, name, description, wear_threshold)
+            )
+            self.connection.commit()
+            return True
+        except sqlite3.Error as e:
+            print(f"Error adding asset type: {e}")
+            return False
+    
+    def get_asset_types(self):
+        """Get all asset types from the database."""
+        if not self.connection:
+            self.connect()
+            
+        try:
+            cursor = self.connection.cursor()
+            cursor.execute("SELECT AssetTypeID, Name, Description, WearThreshold FROM AssetTypes ORDER BY Name")
+            return cursor.fetchall()
+        except sqlite3.Error as e:
+            print(f"Error getting asset types: {e}")
+            return []
+    
+    def delete_asset_type(self, type_id):
+        """Delete an asset type if no assets are using it."""
+        if not self.connection:
+            self.connect()
+            
+        try:
+            cursor = self.connection.cursor()
+            
+            # Check if any assets use this type
+            cursor.execute("SELECT COUNT(*) FROM Assets WHERE AssetTypeID = ?", (type_id,))
+            count = cursor.fetchone()[0]
+            
+            if count > 0:
+                return False, f"Cannot delete asset type {type_id}. It is used by {count} assets."
+            
+            # Delete the asset type
+            cursor.execute("DELETE FROM AssetTypes WHERE AssetTypeID = ?", (type_id,))
+            self.connection.commit()
+            return True, ""
+        except sqlite3.Error as e:
+            print(f"Error deleting asset type: {e}")
+            return False, str(e)
+    
+    # Basic CRUD operations for Assets
+    def add_asset(self, asset_id, tul_id, asset_type_id, instance_number, installation_date, notes=""):
+        """Add a new asset to the database."""
+        if not self.connection:
+            self.connect()
+            
+        try:
+            cursor = self.connection.cursor()
+            cursor.execute(
+                "INSERT INTO Assets (AssetID, TULID, AssetTypeID, InstanceNumber, InstallationDate, Notes) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (asset_id, tul_id, asset_type_id, instance_number, installation_date, notes)
+            )
+            self.connection.commit()
+            return True
+        except sqlite3.Error as e:
+            print(f"Error adding asset: {e}")
+            return False
+    
+    def get_assets(self, tul_id=None, asset_type_id=None):
+        """Get assets filtered by TUL and/or asset type."""
+        if not self.connection:
+            self.connect()
+            
+        try:
+            cursor = self.connection.cursor()
+            query = """
+                SELECT a.AssetID, a.TULID, a.AssetTypeID, a.InstanceNumber, a.InstallationDate, a.Notes,
+                       t.Name as AssetTypeName, tul.Location
+                FROM Assets a
+                JOIN AssetTypes t ON a.AssetTypeID = t.AssetTypeID
+                JOIN TULs tul ON a.TULID = tul.TULID
+            """
+            
+            params = []
+            if tul_id and asset_type_id:
+                query += " WHERE a.TULID = ? AND a.AssetTypeID = ?"
+                params = [tul_id, asset_type_id]
+            elif tul_id:
+                query += " WHERE a.TULID = ?"
+                params = [tul_id]
+            elif asset_type_id:
+                query += " WHERE a.AssetTypeID = ?"
+                params = [asset_type_id]
+                
+            query += " ORDER BY a.TULID, a.AssetTypeID, a.InstanceNumber"
+            
+            cursor.execute(query, params)
+            return cursor.fetchall()
+        except sqlite3.Error as e:
+            print(f"Error getting assets: {e}")
+            return []
+    
+    def delete_asset(self, asset_id):
+        """Delete an asset and all its associated measurements."""
+        if not self.connection:
+            self.connect()
+            
+        try:
+            cursor = self.connection.cursor()
+            
+            # Delete all measurements for this asset
+            cursor.execute("DELETE FROM Measurements WHERE AssetID = ?", (asset_id,))
+            
+            # Delete the asset
+            cursor.execute("DELETE FROM Assets WHERE AssetID = ?", (asset_id,))
+            
+            self.connection.commit()
+            return True
+        except sqlite3.Error as e:
+            print(f"Error deleting asset: {e}")
+            return False
+    
+    # CRUD operations for Measurements
+    def add_measurement(self, asset_id, measurement_date, wear_value, shims_added=0, notes=""):
+        """Add a new measurement record."""
+        if not self.connection:
+            self.connect()
+            
+        try:
+            cursor = self.connection.cursor()
+            cursor.execute(
+                "INSERT INTO Measurements (AssetID, MeasurementDate, WearValue, ShimsAdded, Notes) "
+                "VALUES (?, ?, ?, ?, ?)",
+                (asset_id, measurement_date, wear_value, shims_added, notes)
+            )
+            self.connection.commit()
+            return True
+        except sqlite3.Error as e:
+            print(f"Error adding measurement: {e}")
+            return False
+    
+    def get_measurements(self, asset_id=None, tul_id=None, asset_type_id=None):
+        """Get measurements filtered by asset, TUL, and/or asset type."""
+        if not self.connection:
+            self.connect()
+            
+        try:
+            cursor = self.connection.cursor()
+            
+            base_query = """
+                SELECT m.MeasurementID, m.AssetID, m.MeasurementDate, m.WearValue, m.ShimsAdded, m.Notes,
+                       a.TULID, a.AssetTypeID, a.InstanceNumber, t.Name as AssetTypeName
+                FROM Measurements m
+                JOIN Assets a ON m.AssetID = a.AssetID
+                JOIN AssetTypes t ON a.AssetTypeID = t.AssetTypeID
+            """
+            
+            params = []
+            if asset_id:
+                query = base_query + " WHERE m.AssetID = ? ORDER BY m.MeasurementDate"
+                params = [asset_id]
+            elif tul_id and asset_type_id:
+                query = base_query + " WHERE a.TULID = ? AND a.AssetTypeID = ? ORDER BY a.InstanceNumber, m.MeasurementDate"
+                params = [tul_id, asset_type_id]
+            elif tul_id:
+                query = base_query + " WHERE a.TULID = ? ORDER BY a.AssetTypeID, a.InstanceNumber, m.MeasurementDate"
+                params = [tul_id]
+            elif asset_type_id:
+                query = base_query + " WHERE a.AssetTypeID = ? ORDER BY a.TULID, a.InstanceNumber, m.MeasurementDate"
+                params = [asset_type_id]
+            else:
+                query = base_query + " ORDER BY a.TULID, a.AssetTypeID, a.InstanceNumber, m.MeasurementDate"
+            
+            cursor.execute(query, params)
+            return cursor.fetchall()
+        except sqlite3.Error as e:
+            print(f"Error getting measurements: {e}")
+            return []
+    
+    def delete_measurement(self, measurement_id):
+        """Delete a measurement record by ID."""
+        if not self.connection:
+            self.connect()
+            
+        try:
+            cursor = self.connection.cursor()
+            cursor.execute("DELETE FROM Measurements WHERE MeasurementID = ?", (measurement_id,))
+            self.connection.commit()
+            return True
+        except sqlite3.Error as e:
+            print(f"Error deleting measurement: {e}")
+            return False
+    
+    def close(self):
+        """Close the database connection."""
+        if self.connection:
+            self.connection.close()
+            self.connection = None
+
+
+================================================================================
+FILE: main.py
+================================================================================
+import tkinter as tk
+from tkinter import ttk
+import os
+import sys
+
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+from data.database_manager import DatabaseManager
+from models.prediction_model import WearPredictionModel
+from ui.tul_tab import TULManagementTab
+from ui.asset_tab import AssetManagementTab
+from ui.maintenance_tab import MaintenanceTab
+from ui.prediction_tab import PredictionTab
+from ui.comparison_tab import ComparisonTab
+
+def is_dark_mode():
+    """Check if the system is in dark mode (macOS)."""
+    try:
+        import subprocess
+        result = subprocess.run(
+            ['defaults', 'read', '-g', 'AppleInterfaceStyle'], 
+            capture_output=True, 
+            text=True
+        )
+        return result.stdout.strip() == 'Dark'
+    except Exception:
+        # If there's any error, assume light mode
+        return False
+
+class TULApp:
+    """Main application for TUL asset wear prediction and maintenance tracking."""
+    
+    def __init__(self, root):
+        self.root = root
+        self.db_manager = DatabaseManager()
+        self.prediction_model = WearPredictionModel()
+        
+        # Initialize database
+        self.db_manager.connect()
+        self.db_manager.create_tables()
+        
+        # Set up the UI
+        self.setup_ui()
+    
+    def setup_ui(self):
+        """Set up the user interface."""
+        self.root.title("TUL Asset Maintenance Tracker")
+        self.root.geometry("1200x800")
+        
+        # Set up styles for the UI
+        self.setup_styles()
+        
+        # Create main notebook with tabs
+        self.notebook = ttk.Notebook(self.root)
+        self.notebook.pack(fill='both', expand=True, padx=10, pady=10)
+        
+        # Create tabs
+        self.tul_tab = ttk.Frame(self.notebook)
+        self.asset_tab = ttk.Frame(self.notebook)
+        self.maintenance_tab = ttk.Frame(self.notebook)
+        self.prediction_tab = ttk.Frame(self.notebook)
+        self.comparison_tab = ttk.Frame(self.notebook)
+        
+        self.notebook.add(self.tul_tab, text="TUL Management")
+        self.notebook.add(self.asset_tab, text="Asset Management")
+        self.notebook.add(self.maintenance_tab, text="Maintenance Records")
+        self.notebook.add(self.prediction_tab, text="Wear Prediction")
+        self.notebook.add(self.comparison_tab, text="Comparison Analysis")
+
+        # Company footer
+        footer_frame = ttk.Frame(self.root)
+        footer_frame.pack(side=tk.BOTTOM, fill=tk.X)
+        
+        company_label = ttk.Label(
+            footer_frame, 
+            text="Developed by OreChain Labs 🧬", 
+            font=('Arial', 12, 'italic'),
+            foreground='#555555',  # Dark gray color
+            anchor=tk.E  # Right-aligned
+        )
+        company_label.pack(side=tk.TOP, fill=tk.X, padx=10, pady=2)
+        company_label.configure(anchor=tk.CENTER)
+
+        # Add status bar
+        self.status_var = tk.StringVar()
+        self.status_var.set("Ready")
+        self.status_bar = ttk.Label(self.root, textvariable=self.status_var, relief=tk.SUNKEN, anchor=tk.W)
+        self.status_bar.pack(side=tk.BOTTOM, fill=tk.X)
+        
+        # Initialize tabs
+        self.tul_management_tab = TULManagementTab(self.tul_tab, self.db_manager, self.status_var)
+        self.asset_management_tab = AssetManagementTab(self.asset_tab, self.db_manager, self.status_var)
+        self.maintenance_tab_ui = MaintenanceTab(self.maintenance_tab, self.db_manager, self.status_var)
+        self.prediction_tab_ui = PredictionTab(self.prediction_tab, self.db_manager, self.prediction_model, self.status_var)
+        self.comparison_tab_ui = ComparisonTab(self.comparison_tab, self.db_manager, self.prediction_model, self.status_var)
+    
+    def setup_styles(self):
+        """Set up custom styles for the application."""
+        style = ttk.Style()
+        
+        # Check if dark mode is enabled
+        is_dark = is_dark_mode()
+        
+        if is_dark:
+            # Dark mode theme
+            style.configure("TFrame", background="#2E2E2E")
+            style.configure("TLabel", background="#2E2E2E", foreground="#FFFFFF")
+            style.configure("TButton", background="#505050", foreground="#FFFFFF")
+            style.configure("TEntry", fieldbackground="#3E3E3E", foreground="#FFFFFF")
+            style.configure("TCombobox", fieldbackground="#3E3E3E", foreground="#FFFFFF")
+            style.configure("TNotebook", background="#2E2E2E", tabmargins=[2, 5, 2, 0])
+            style.configure("TNotebook.Tab", background="#2E2E2E", foreground="#FFFFFF", padding=[10, 2])
+            style.map("TNotebook.Tab", background=[("selected", "#505050")])
+            
+            style.configure("Delete.TButton", foreground="#FF6B6B")
+        else:
+            # Light mode theme
+            style.configure("Delete.TButton", foreground="#D32F2F")
+        
+        # Common styles
+        style.configure("Title.TLabel", font=("Arial", 14, "bold"))
+        style.configure("Subtitle.TLabel", font=("Arial", 12, "bold"))
+
+def main(): 
+    """Main function to start the application."""
+    root = tk.Tk()
+    app = TULApp(root)
+    root.mainloop()
+
+if __name__ == "__main__":
+    main()
+
+
+================================================================================
+FILE: models/__init__.py
+================================================================================
+
+
+
+================================================================================
+FILE: models/indexer.py
+================================================================================
+class Indexer:
+    """Model representing a train indexer."""
+    
+    def __init__(self, indexer_id, location="", installation_date=None, notes=""):
+        self.indexer_id = indexer_id
+        self.location = location
+        self.installation_date = installation_date
+        self.notes = notes
+        
+    def to_dict(self):
+        """Convert to dictionary for database storage."""
+        return {
+            "IndexerID": self.indexer_id,
+            "Location": self.location,
+            "InstallationDate": self.installation_date,
+            "Notes": self.notes
+        }
+
+
+================================================================================
+FILE: models/measurement.py
+================================================================================
+from datetime import datetime
+
+class Measurement:
+    """Model representing an indexer wear measurement."""
+    
+    def __init__(self, indexer_id, measurement_date=None, wear_value=0.0, 
+                 shims_added=0.0, notes="", measurement_id=None):
+        self.measurement_id = measurement_id
+        self.indexer_id = indexer_id
+        self.measurement_date = measurement_date or datetime.now().date()
+        self.wear_value = wear_value
+        self.shims_added = shims_added
+        self.notes = notes
+        
+    def to_dict(self):
+        """Convert to dictionary for database storage."""
+        return {
+            "MeasurementID": self.measurement_id,
+            "IndexerID": self.indexer_id,
+            "MeasurementDate": self.measurement_date,
+            "WearValue": self.wear_value,
+            "ShimsAdded": self.shims_added,
+            "Notes": self.notes
+        }
+
+
+================================================================================
+FILE: models/prediction_model.py
+================================================================================
+# File: models/prediction_model.py
+
+import numpy as np
+from sklearn.preprocessing import PolynomialFeatures
+from sklearn.linear_model import LinearRegression
+from datetime import datetime, timedelta
+import pickle
+
+class WearPredictionModel:
+    """Handles the polynomial regression modeling for wear prediction."""
+    
+    def __init__(self, degree=2):
+        self.model = None
+        self.poly_features = None
+        self.degree = degree
+        
+    def fit(self, days, wear_values):
+        """Train the model on the provided data."""
+        if len(days) < 3:
+            return False, "Need at least 3 data points for prediction"
+            
+        # Reshape for sklearn
+        X = np.array(days).reshape(-1, 1)
+        y = np.array(wear_values)
+        
+        # Create polynomial features
+        self.poly_features = PolynomialFeatures(degree=self.degree)
+        X_poly = self.poly_features.fit_transform(X)
+        
+        # Train the model
+        self.model = LinearRegression()
+        self.model.fit(X_poly, y)
+        
+        return True, "Model trained successfully"
+        
+    def predict(self, days):
+        """Predict wear for the given days."""
+        if self.model is None or self.poly_features is None:
+            return None, "Model not trained"
+            
+        # Convert to numpy array and reshape
+        X = np.array(days).reshape(-1, 1)
+        
+        # Transform to polynomial features
+        X_poly = self.poly_features.transform(X)
+        
+        # Predict
+        predictions = self.model.predict(X_poly)
+        
+        return predictions, "Prediction completed"
+        
+    def calculate_threshold_crossing(self, start_day, days_ahead, start_date, threshold):
+        """Calculate when wear crosses the maintenance threshold."""
+        if self.model is None or self.poly_features is None:
+            return None, "Model not trained"
+            
+        # Generate sequence of days for prediction
+        future_days = range(start_day, start_day + days_ahead + 1)
+        
+        # Predict wear for those days
+        predictions, _ = self.predict(future_days)
+        
+        # Find where prediction crosses threshold
+        for i, pred in enumerate(predictions):
+            if pred >= threshold:
+                # Calculate the date
+                crossing_date = start_date + timedelta(days=i)
+                days_until = i
+                return crossing_date, days_until
+                
+        return None, "Threshold not reached within prediction window"
+        
+    def save_model(self, filename):
+        """Save trained model to file."""
+        if self.model is None:
+            return False, "No model to save"
+            
+        try:
+            with open(filename, 'wb') as f:
+                pickle.dump((self.model, self.poly_features, self.degree), f)
+            return True, "Model saved successfully"
+        except Exception as e:
+            return False, f"Error saving model: {str(e)}"
+            
+    def load_model(self, filename):
+        """Load trained model from file."""
+        try:
+            with open(filename, 'rb') as f:
+                self.model, self.poly_features, self.degree = pickle.load(f)
+            return True, "Model loaded successfully"
+        except Exception as e:
+            return False, f"Error loading model: {str(e)}"
+
+
+================================================================================
+FILE: sample_data_generator.py
+================================================================================
+import sys
+import os
+import random
+import math
+from datetime import datetime, timedelta
+import sqlite3
+
+# Add the project root to the path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from data.database_manager import DatabaseManager
+
+def generate_sample_data():
+    """Generate realistic sample data with irregular wear patterns and outliers."""
+    print("Generating sample data with irregular wear patterns and outliers...")
+    
+    # Initialize the database manager
+    db_manager = DatabaseManager()
+    db_manager.connect()
+    db_manager.create_tables()
+    
+    # Clear existing data if requested
+    if input("Clear existing data? (y/n): ").lower() == 'y':
+        try:
+            conn = sqlite3.connect(db_manager.db_path)
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM Measurements")
+            cursor.execute("DELETE FROM Assets")
+            conn.commit()
+            conn.close()
+            print("Existing measurements and assets cleared.")
+        except Exception as e:
+            print(f"Error clearing data: {e}")
+    
+    # Get existing TULs
+    tuls = db_manager.get_tuls()
+    if not tuls:
+        print("No TULs found. Please run the application first to initialize the database.")
+        return
+    
+    # Get asset types
+    asset_types = db_manager.get_asset_types()
+    if not asset_types:
+        print("No asset types found. Please run the application first to initialize the database.")
+        return
+    
+    # Generate assets and measurements
+    today = datetime.now().date()
+    three_years_ago = today - timedelta(days=3*365)
+    
+    # For each TUL, create 8 pinions and 8 rollers
+    for tul in tuls:
+        tul_id = tul[0]
+        print(f"Adding assets and measurements for {tul_id}...")
+        
+        # Randomly select outliers
+        pinion_outlier = random.randint(1, 8)
+        roller_outlier = random.randint(1, 8)
+        
+        print(f"  - Outlier pinion: #{pinion_outlier}")
+        print(f"  - Outlier roller: #{roller_outlier}")
+        
+        # Add 8 Pinions per TUL
+        for i in range(1, 9):
+            asset_id = f"{tul_id}-INDPIN-{i:02d}"
+            install_date = three_years_ago + timedelta(days=random.randint(0, 30))  # Installed ~3 years ago
+            
+            # Add the asset
+            db_manager.add_asset(
+                asset_id=asset_id,
+                tul_id=tul_id,
+                asset_type_id="INDPIN",
+                instance_number=i,
+                installation_date=install_date,
+                notes=f"Pinion {i} for {tul_id}"
+            )
+            
+            # Set outlier status
+            is_outlier = (i == pinion_outlier)
+            
+            # Generate measurements every 12 weeks
+            generate_measurements(
+                db_manager, 
+                asset_id, 
+                install_date, 
+                is_outlier=is_outlier, 
+                is_pinion=True,
+                outlier_factor=1.8  # Outliers wear 80% faster
+            )
+        
+        # Add 8 Rollers per TUL
+        for i in range(1, 9):
+            asset_id = f"{tul_id}-INDROL-{i:02d}"
+            install_date = three_years_ago + timedelta(days=random.randint(0, 30))  # Installed ~3 years ago
+            
+            # Add the asset
+            db_manager.add_asset(
+                asset_id=asset_id,
+                tul_id=tul_id,
+                asset_type_id="INDROL",
+                instance_number=i,
+                installation_date=install_date,
+                notes=f"Roller {i} for {tul_id}"
+            )
+            
+            # Set outlier status
+            is_outlier = (i == roller_outlier)
+            
+            # Generate measurements every 12 weeks
+            generate_measurements(
+                db_manager, 
+                asset_id, 
+                install_date, 
+                is_outlier=is_outlier, 
+                is_pinion=False,
+                outlier_factor=1.7  # Outliers wear 70% faster
+            )
+    
+    print("Sample data generation complete!")
+
+def generate_measurements(db_manager, asset_id, install_date, is_outlier=False, is_pinion=True, outlier_factor=1.8):
+    """Generate measurements every 12 weeks with random maintenance events that reset wear to 0."""
+    today = datetime.now().date()
+    
+    # Set up parameters based on asset type
+    if is_pinion:
+        # Pinions wear faster
+        base_wear_rate = random.uniform(2.6, 3.2)  # mm per 30 days
+    else:
+        # Rollers wear slower
+        base_wear_rate = random.uniform(1.6, 2.4)  # mm per 30 days
+    
+    # Enhance wear rate for outliers
+    if is_outlier:
+        base_wear_rate *= outlier_factor
+    
+    # Measurements occur every 12 weeks (84 days)
+    measurement_interval = 84  # 12 weeks
+    
+    # Generate measurement dates spanning 3 years
+    measurement_dates = []
+    current_date = install_date + timedelta(days=measurement_interval)
+    
+    while current_date <= today:
+        measurement_dates.append(current_date)
+        current_date += timedelta(days=measurement_interval)
+    
+    # Schedule random maintenance events (about every 6-8 measurements)
+    # Assume maintenance occurs right after a measurement
+    maintenance_dates = []
+    
+    # Get total number of measurements
+    num_measurements = len(measurement_dates)
+    
+    if num_measurements >= 6:
+        # Determine how many maintenance events to schedule
+        # Aim for approximately every 6-8 measurements
+        target_maintenance_count = num_measurements // 7
+        maintenance_count = max(1, min(target_maintenance_count, num_measurements // 3))
+        
+        # Select random indices for maintenance, avoiding the last measurement
+        maintenance_indices = sorted(random.sample(range(2, num_measurements-1), maintenance_count))
+        
+        maintenance_dates = [measurement_dates[idx] for idx in maintenance_indices]
+    
+    # Generate wear values for each date
+    last_maintenance_date = install_date
+    accumulated_wear = 0.0
+    maintenance_count = 0
+    
+    # Create acceleration/deceleration pattern
+    # This will generate a value between 0.7 and 1.3 that varies over time
+    def wear_multiplier(days):
+        # Create a pattern that varies over time
+        cycle1 = math.sin(days / 180 * math.pi)  # Long cycle (180 days)
+        cycle2 = math.sin(days / 60 * math.pi) * 0.3  # Medium cycle (60 days)
+        cycle3 = math.sin(days / 20 * math.pi) * 0.1  # Short cycle (20 days)
+        
+        # Combine cycles and normalize to range 0.7-1.3
+        multiplier = 1.0 + (cycle1 + cycle2 + cycle3) * 0.3
+        
+        # Add some randomness
+        multiplier += random.uniform(-0.05, 0.05)
+        
+        return round(multiplier, 2)  # Round to 2 decimal places
+    
+    # Generate and add measurements
+    for idx, date in enumerate(measurement_dates):
+        # Calculate days since last maintenance
+        days_since_maintenance = (date - last_maintenance_date).days
+        
+        # Calculate wear rate with acceleration/deceleration
+        current_rate = base_wear_rate * wear_multiplier(days_since_maintenance)
+        
+        # Calculate wear since last measurement or maintenance
+        period_wear = current_rate * days_since_maintenance / 30
+        accumulated_wear += period_wear
+        
+        # Round to 2 decimal places for realism
+        wear_value = round(accumulated_wear, 2)
+        
+        # Determine if maintenance was performed after the previous measurement
+        previous_date = measurement_dates[idx-1] if idx > 0 else install_date
+        maintenance_before_this = any(previous_date <= maint_date < date for maint_date in maintenance_dates)
+        
+        if maintenance_before_this:
+            # Reset wear to 0 for this measurement due to maintenance
+            notes = f"Maintenance performed since last measurement. Wear reset to 0."
+            last_maintenance_date = previous_date
+            accumulated_wear = 0.0
+            wear_value = 0.0
+            maintenance_count += 1
+        else:
+            if is_outlier and wear_value > (30 if is_pinion else 20):
+                notes = f"Higher than expected wear rate ({current_rate:.2f} mm/month), monitoring closely"
+            else:
+                notes = f"Regular 12-week measurement, current wear rate: {current_rate:.2f} mm/month"
+        
+        # Add the measurement to the database
+        db_manager.add_measurement(
+            asset_id=asset_id,
+            measurement_date=date,
+            wear_value=wear_value,
+            shims_added=0,  # No shims added, wear is reset through maintenance
+            notes=notes
+        )
+    
+    # Log summary
+    print(f"Added {len(measurement_dates)} measurements for {asset_id}")
+    print(f"  - {maintenance_count} maintenance events that reset wear to 0")
+    print(f"  - Base rate: {base_wear_rate:.2f}mm/month (Outlier: {is_outlier})")
+
+if __name__ == "__main__":
+    generate_sample_data()
+
+
+================================================================================
+FILE: test_data_management.py
+================================================================================
+import tkinter as tk
+from tkinter import ttk
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+from data.database_manager import DatabaseManager
+from models.indexer import Indexer
+from models.measurement import Measurement
+from datetime import datetime, timedelta
+
+def test_database_operations():
+    """Test basic database operations."""
+    print("Testing database operations...")
+    
+    # Create a test database
+    db = DatabaseManager("test_management.db")
+    db.connect()
+    db.create_tables()
+    
+    # Add test indexers
+    print("Adding test indexers...")
+    indexer1_success = db.add_indexer("IDX001", "North Platform", datetime.now().date(), "Test indexer 1")
+    indexer2_success = db.add_indexer("IDX002", "South Platform", datetime.now().date(), "Test indexer 2")
+    
+    if indexer1_success and indexer2_success:
+        print("✓ Successfully added test indexers")
+    else:
+        print("✗ Failed to add test indexers")
+    
+    # Add test measurements
+    print("\nAdding test measurements...")
+    today = datetime.now().date()
+    
+    # Add measurements for IDX001
+    measurements_success = True
+    for i in range(5):
+        date = today - timedelta(days=i*15)  # Measurements every 15 days
+        wear = i * 2.5  # Increasing wear values
+        shims = 0.0 if i < 4 else 5.0  # Add shims at the last measurement
+        
+        success = db.add_measurement("IDX001", date, wear, shims, f"Measurement {i+1}")
+        if not success:
+            measurements_success = False
+    
+    # Add measurements for IDX002
+    for i in range(3):
+        date = today - timedelta(days=i*10)  # Measurements every 10 days
+        wear = i * 3.2  # Different wear rate
+        
+        success = db.add_measurement("IDX002", date, wear, 0.0, f"Measurement {i+1}")
+        if not success:
+            measurements_success = False
+    
+    if measurements_success:
+        print("✓ Successfully added test measurements")
+    else:
+        print("✗ Failed to add some measurements")
+    
+    # Retrieve and verify data
+    print("\nRetrieving indexers...")
+    indexers = db.get_indexers()
+    print(f"Found {len(indexers)} indexers:")
+    for idx in indexers:
+        print(f"  - {idx[0]} (Location: {idx[1]})")
+    
+    print("\nRetrieving measurements for IDX001...")
+    measurements = db.get_measurements("IDX001")
+    print(f"Found {len(measurements)} measurements:")
+    for m in measurements:
+        print(f"  - Date: {m[2]}, Wear: {m[3]:.1f}mm, Shims: {m[4]:.1f}")
+    
+    # Test CSV export
+    print("\nTesting CSV export...")
+    export_success = db.export_to_csv("test_export.csv")
+    
+    if export_success:
+        print(f"✓ Successfully exported data to test_export.csv")
+    else:
+        print("✗ Failed to export data")
+    
+    print("\nDatabase test completed!")
+
+def test_ui():
+    """Launch the UI for manual testing."""
+    print("Launching UI for manual testing...")
+    print("Please test the following features:")
+    print("1. Adding a new indexer")
+    print("2. Adding measurements to an indexer")
+    print("3. Viewing data for a specific indexer")
+    print("4. Viewing all data")
+    print("5. Importing and exporting CSV files")
+    print("\nClose the window when testing is complete.\n")
+    
+    # Import here to avoid circular imports
+    from main import IndexerApp
+    
+    root = tk.Tk()
+    app = IndexerApp(root)
+    root.mainloop()
+
+if __name__ == "__main__":
+    # Run database operation tests
+    test_database_operations()
+    
+    # Run UI tests
+    user_input = input("\nWould you like to test the UI? (y/n): ")
+    if user_input.lower() == 'y':
+        test_ui()
+
+
+================================================================================
+FILE: test_matplotlib.py
+================================================================================
+import matplotlib
+# Set the backend explicitly before importing pyplot
+matplotlib.use('TkAgg')  # This should be more compatible with macOS
+import matplotlib.pyplot as plt
+
+print(f"Current backend: {matplotlib.get_backend()}")
+
+# Create a very simple plot
+plt.figure()
+plt.plot([1, 2, 3, 4])
+plt.title("Test Plot")
+plt.savefig("test_plot.png")
+print("Plot saved successfully to test_plot.png")
+
+
+================================================================================
+FILE: test_setup.py
+================================================================================
+from data.database_manager import DatabaseManager
+from models.indexer import Indexer
+from models.measurement import Measurement
+from models.prediction_model import WearPredictionModel
+from datetime import datetime, timedelta
+import numpy as np
+import matplotlib.pyplot as plt
+
+def test_database():
+    """Test database setup and operations."""
+    print("Testing database connection...")
+    db = DatabaseManager("test.db")
+    db.connect()
+    db.create_tables()
+    print("Database created successfully!")
+    
+def test_prediction_model():
+    """Test prediction model functionality."""
+    print("Testing prediction model...")
+    
+    # Create some sample data
+    days = list(range(10))
+    # Non-linear wear pattern (polynomial)
+    wear = [0.0, 0.5, 1.5, 3.0, 5.0, 7.5, 10.5, 14.0, 18.0, 22.5]
+    
+    # Train model
+    model = WearPredictionModel(degree=2)
+    success, message = model.fit(days, wear)
+    print(f"Model training: {message}")
+    
+    # Predict future
+    future_days = list(range(15))
+    predictions, _ = model.predict(future_days)
+    
+    # Calculate threshold crossing
+    today = datetime.now().date()
+    crossing_date, days_until = model.calculate_threshold_crossing(
+        start_day=days[-1], 
+        days_ahead=30, 
+        start_date=today, 
+        threshold=25.0
+    )
+    
+    if crossing_date:
+        print(f"Maintenance needed on: {crossing_date} (in {days_until} days)")
+    else:
+        print("No maintenance needed within prediction window")
+    
+    # Plot results
+    plt.figure(figsize=(10, 6))
+    plt.scatter(days, wear, color='blue', label='Actual Data')
+    plt.plot(future_days, predictions, color='red', label='Predictions')
+    plt.axhline(y=25.0, color='green', linestyle='--', label='Maintenance Threshold')
+    plt.xlabel('Days')
+    plt.ylabel('Wear (mm)')
+    plt.title('Indexer Wear Prediction')
+    plt.legend()
+    plt.grid(True, alpha=0.3)
+    plt.savefig('prediction_test.png')
+    plt.close()
+    
+    print("Prediction test complete! Check prediction_test.png for results.")
+
+if __name__ == "__main__":
+    test_database()
+    test_prediction_model()
+
+
+
+
+================================================================================
+FILE: tkthemeswitch.py
+================================================================================
+import customtkinter as ct 
+from customtkinter import *
+
+ct.set_appearance_mode("dark")
+ct.set_default_theme("dark-blue")
+
+
+main_window = CTk()
+main_window.geometry("600*400 + 200 + 150")
+main_window.title("CTKswitch")
+
+def changeMode():
+    val = switch.get()
+    if val:
+        ct.set_appearance_mode("light")
+    else:
+        ct.set_appearance_mode("dark")
+
+switch = CTkswitch(main_window, text="Dark Mode", command=changeMode,
+                   onvalue = 1, offvalue = 0, command=changeMode)
+switch.pack(pady=20)
+print(switch.get())
+main_window.mainloop()
+
+
+
+================================================================================
+FILE: ui/__init__.py
+================================================================================
+
+
+
+================================================================================
+FILE: ui/asset_tab.py
+================================================================================
+import tkinter as tk
+from tkinter import ttk, messagebox
+from datetime import datetime
+
+class AssetManagementTab:
+    """Implements the Asset Management tab functionality."""
+    
+    def __init__(self, parent, db_manager, status_var):
+        self.parent = parent
+        self.db_manager = db_manager
+        self.status_var = status_var
+        
+        # Variables for Asset Type form
+        self.asset_type_id_var = tk.StringVar()
+        self.asset_type_name_var = tk.StringVar()
+        self.asset_type_desc_var = tk.StringVar()
+        self.wear_threshold_var = tk.DoubleVar(value=60.0)
+        
+        # Variables for Asset Instance form
+        self.asset_id_var = tk.StringVar()
+        self.tul_id_var = tk.StringVar()
+        self.asset_type_var = tk.StringVar()
+        self.instance_number_var = tk.IntVar(value=1)
+        self.asset_install_date_var = tk.StringVar(value=datetime.now().strftime('%Y-%m-%d'))
+        self.asset_notes_var = tk.StringVar()
+        
+        # Variable for filtering
+        self.filter_tul_var = tk.StringVar()
+        self.filter_asset_type_var = tk.StringVar()
+        
+        self.setup_ui()
+        
+    def setup_ui(self):
+        """Set up the user interface for the Asset Management tab."""
+        # Create main layout with notebook for sub-tabs
+        self.sub_notebook = ttk.Notebook(self.parent)
+        self.sub_notebook.pack(fill='both', expand=True, padx=5, pady=5)
+        
+        # Create sub-tabs
+        self.type_tab = ttk.Frame(self.sub_notebook)
+        self.instance_tab = ttk.Frame(self.sub_notebook)
+        
+        self.sub_notebook.add(self.type_tab, text="Asset Types")
+        self.sub_notebook.add(self.instance_tab, text="Asset Instances")
+        
+        # Setup Asset Types tab
+        self.setup_asset_types_tab()
+        
+        # Setup Asset Instances tab
+        self.setup_asset_instances_tab()
+        
+    def setup_asset_types_tab(self):
+        """Set up the Asset Types sub-tab."""
+        # Create main layout: left panel for input, right panel for display
+        left_frame = ttk.Frame(self.type_tab, padding="10")
+        left_frame.pack(side=tk.LEFT, fill=tk.Y, padx=5, pady=5)
+        
+        right_frame = ttk.Frame(self.type_tab, padding="10")
+        right_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=5, pady=5)
+        
+        # Left frame - Asset Type Management Controls
+        ttk.Label(left_frame, text="Asset Type Management", style="Title.TLabel").pack(anchor=tk.W, pady=5)
+        ttk.Separator(left_frame, orient=tk.HORIZONTAL).pack(fill=tk.X, pady=5)
+        
+        # Asset Type Management Section
+        type_frame = ttk.LabelFrame(left_frame, text="Add New Asset Type")
+        type_frame.pack(fill=tk.X, padx=5, pady=5)
+        
+        ttk.Label(type_frame, text="Type ID:").grid(row=0, column=0, sticky=tk.W, padx=5, pady=2)
+        ttk.Entry(type_frame, textvariable=self.asset_type_id_var, width=20).grid(row=0, column=1, padx=5, pady=2)
+        
+        ttk.Label(type_frame, text="Name:").grid(row=1, column=0, sticky=tk.W, padx=5, pady=2)
+        ttk.Entry(type_frame, textvariable=self.asset_type_name_var, width=20).grid(row=1, column=1, padx=5, pady=2)
+        
+        ttk.Label(type_frame, text="Description:").grid(row=2, column=0, sticky=tk.W, padx=5, pady=2)
+        ttk.Entry(type_frame, textvariable=self.asset_type_desc_var, width=20).grid(row=2, column=1, padx=5, pady=2)
+        
+        ttk.Label(type_frame, text="Wear Threshold:").grid(row=3, column=0, sticky=tk.W, padx=5, pady=2)
+        ttk.Spinbox(type_frame, from_=0, to=100, increment=5.0, textvariable=self.wear_threshold_var, width=10).grid(row=3, column=1, padx=5, pady=2)
+        
+        button_frame = ttk.Frame(type_frame)
+        button_frame.grid(row=4, column=0, columnspan=2, pady=5)
+        
+        ttk.Button(button_frame, text="Add Asset Type", command=self.add_asset_type).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="Clear Form", command=self.clear_asset_type_form).pack(side=tk.LEFT, padx=5)
+        
+        # Right frame - Asset Type Display
+        ttk.Label(right_frame, text="Asset Types", style="Title.TLabel").pack(anchor=tk.W, pady=5)
+        
+        # Add refresh button
+        refresh_frame = ttk.Frame(right_frame)
+        refresh_frame.pack(fill=tk.X, pady=5)
+        
+        ttk.Button(refresh_frame, text="Refresh List", command=self.load_asset_types).pack(side=tk.RIGHT)
+        
+        # Create Treeview for Asset Types
+        self.type_tree_frame = ttk.Frame(right_frame)
+        self.type_tree_frame.pack(fill=tk.BOTH, expand=True, pady=5)
+        
+        columns = ("id", "name", "description", "threshold")
+        self.type_tree = ttk.Treeview(self.type_tree_frame, columns=columns, show="headings")
+        
+        # Define column headings
+        self.type_tree.heading("id", text="Type ID")
+        self.type_tree.heading("name", text="Name")
+        self.type_tree.heading("description", text="Description")
+        self.type_tree.heading("threshold", text="Wear Threshold")
+        
+        # Define column widths
+        self.type_tree.column("id", width=100)
+        self.type_tree.column("name", width=150)
+        self.type_tree.column("description", width=200)
+        self.type_tree.column("threshold", width=100)
+        
+        # Add scrollbar
+        scrollbar = ttk.Scrollbar(self.type_tree_frame, orient=tk.VERTICAL, command=self.type_tree.yview)
+        self.type_tree.configure(yscrollcommand=scrollbar.set)
+        
+        self.type_tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        
+    def setup_asset_instances_tab(self):
+        """Set up the Asset Instances sub-tab."""
+        # Create main layout: left panel for input, right panel for display
+        left_frame = ttk.Frame(self.instance_tab, padding="10")
+        left_frame.pack(side=tk.LEFT, fill=tk.Y, padx=5, pady=5)
+        
+        right_frame = ttk.Frame(self.instance_tab, padding="10")
+        right_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=5, pady=5)
+        
+        # Left frame - Asset Instance Management Controls
+        ttk.Label(left_frame, text="Asset Instance Management", style="Title.TLabel").pack(anchor=tk.W, pady=5)
+        ttk.Separator(left_frame, orient=tk.HORIZONTAL).pack(fill=tk.X, pady=5)
+        
+        # Asset Instance Management Section
+        instance_frame = ttk.LabelFrame(left_frame, text="Add New Asset Instance")
+        instance_frame.pack(fill=tk.X, padx=5, pady=5)
+        
+        ttk.Label(instance_frame, text="Asset ID:").grid(row=0, column=0, sticky=tk.W, padx=5, pady=2)
+        ttk.Entry(instance_frame, textvariable=self.asset_id_var, width=20).grid(row=0, column=1, padx=5, pady=2)
+        
+        ttk.Label(instance_frame, text="TUL ID:").grid(row=1, column=0, sticky=tk.W, padx=5, pady=2)
+        self.tul_combo = ttk.Combobox(instance_frame, textvariable=self.tul_id_var, width=18, state="readonly")
+        self.tul_combo.grid(row=1, column=1, padx=5, pady=2)
+        
+        ttk.Label(instance_frame, text="Asset Type:").grid(row=2, column=0, sticky=tk.W, padx=5, pady=2)
+        self.asset_type_combo = ttk.Combobox(instance_frame, textvariable=self.asset_type_var, width=18, state="readonly")
+        self.asset_type_combo.grid(row=2, column=1, padx=5, pady=2)
+        
+        ttk.Label(instance_frame, text="Instance Number:").grid(row=3, column=0, sticky=tk.W, padx=5, pady=2)
+        ttk.Spinbox(instance_frame, from_=1, to=100, textvariable=self.instance_number_var, width=10).grid(row=3, column=1, padx=5, pady=2)
+        
+        ttk.Label(instance_frame, text="Installation Date:").grid(row=4, column=0, sticky=tk.W, padx=5, pady=2)
+        ttk.Entry(instance_frame, textvariable=self.asset_install_date_var, width=20).grid(row=4, column=1, padx=5, pady=2)
+        
+        ttk.Label(instance_frame, text="Notes:").grid(row=5, column=0, sticky=tk.W, padx=5, pady=2)
+        ttk.Entry(instance_frame, textvariable=self.asset_notes_var, width=20).grid(row=5, column=1, padx=5, pady=2)
+        
+        button_frame = ttk.Frame(instance_frame)
+        button_frame.grid(row=6, column=0, columnspan=2, pady=5)
+        
+        ttk.Button(button_frame, text="Add Asset", command=self.add_asset).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="Clear Form", command=self.clear_asset_form).pack(side=tk.LEFT, padx=5)
+        
+        # Generate Asset ID button
+        ttk.Button(instance_frame, text="Generate ID", command=self.generate_asset_id).grid(row=0, column=2, padx=5, pady=2)
+        
+        # Right frame - Asset Instance Display
+        ttk.Label(right_frame, text="Asset Instances", style="Title.TLabel").pack(anchor=tk.W, pady=5)
+        
+        # Filter section
+        filter_frame = ttk.Frame(right_frame)
+        filter_frame.pack(fill=tk.X, pady=5)
+        
+        ttk.Label(filter_frame, text="Filter by TUL:").pack(side=tk.LEFT, padx=5)
+        self.filter_tul_combo = ttk.Combobox(filter_frame, textvariable=self.filter_tul_var, width=15, state="readonly")
+        self.filter_tul_combo.pack(side=tk.LEFT, padx=5)
+        
+        ttk.Label(filter_frame, text="Filter by Type:").pack(side=tk.LEFT, padx=5)
+        self.filter_type_combo = ttk.Combobox(filter_frame, textvariable=self.filter_asset_type_var, width=15, state="readonly")
+        self.filter_type_combo.pack(side=tk.LEFT, padx=5)
+        
+        ttk.Button(filter_frame, text="Apply Filter", command=self.apply_asset_filter).pack(side=tk.LEFT, padx=5)
+        ttk.Button(filter_frame, text="Clear Filter", command=self.clear_asset_filter).pack(side=tk.LEFT, padx=5)
+        ttk.Button(filter_frame, text="Refresh", command=self.load_assets).pack(side=tk.RIGHT, padx=5)
+        
+        # Create Treeview for Asset Instances
+        self.asset_tree_frame = ttk.Frame(right_frame)
+        self.asset_tree_frame.pack(fill=tk.BOTH, expand=True, pady=5)
+        
+        columns = ("id", "tul", "type", "instance", "installation_date", "notes")
+        self.asset_tree = ttk.Treeview(self.asset_tree_frame, columns=columns, show="headings")
+        
+        # Define column headings
+        self.asset_tree.heading("id", text="Asset ID")
+        self.asset_tree.heading("tul", text="TUL")
+        self.asset_tree.heading("type", text="Asset Type")
+        self.asset_tree.heading("instance", text="Instance #")
+        self.asset_tree.heading("installation_date", text="Installation Date")
+        self.asset_tree.heading("notes", text="Notes")
+        
+        # Define column widths
+        self.asset_tree.column("id", width=120)
+        self.asset_tree.column("tul", width=80)
+        self.asset_tree.column("type", width=100)
+        self.asset_tree.column("instance", width=80)
+        self.asset_tree.column("installation_date", width=120)
+        self.asset_tree.column("notes", width=200)
+        
+        # Add scrollbar
+        scrollbar = ttk.Scrollbar(self.asset_tree_frame, orient=tk.VERTICAL, command=self.asset_tree.yview)
+        self.asset_tree.configure(yscrollcommand=scrollbar.set)
+        
+        self.asset_tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        # Actions section
+        actions_frame = ttk.Frame(right_frame)
+        actions_frame.pack(fill=tk.X, pady=5)
+        
+        ttk.Button(actions_frame, text="View Measurements", command=self.view_asset_measurements).pack(side=tk.LEFT, padx=5)
+        ttk.Button(actions_frame, text="Delete Asset", style="Delete.TButton", command=self.delete_asset).pack(side=tk.LEFT, padx=5)
+        
+        # Load initial data
+        self.load_tuls()
+        self.load_asset_types()
+        self.load_assets()
+        
+    def add_asset_type(self):
+        """Add a new asset type to the database."""
+        type_id = self.asset_type_id_var.get().strip()
+        name = self.asset_type_name_var.get().strip()
+        desc = self.asset_type_desc_var.get().strip()
+        threshold = self.wear_threshold_var.get()
+        
+        if not type_id or not name:
+            messagebox.showerror("Input Error", "Type ID and Name are required.")
+            return
+            
+        success = self.db_manager.add_asset_type(type_id, name, desc, threshold)
+        
+        if success:
+            self.status_var.set(f"Asset Type {name} added successfully.")
+            self.clear_asset_type_form()
+            self.load_asset_types()
+        else:
+            messagebox.showerror("Database Error", "Failed to add Asset Type. It may already exist.")
+            
+    def clear_asset_type_form(self):
+        """Clear the asset type form fields."""
+        self.asset_type_id_var.set("")
+        self.asset_type_name_var.set("")
+        self.asset_type_desc_var.set("")
+        self.wear_threshold_var.set(60.0)
+        
+    def add_asset(self):
+        """Add a new asset instance to the database."""
+        asset_id = self.asset_id_var.get().strip()
+        tul_id = self.tul_id_var.get()
+        asset_type_id = self.asset_type_var.get()
+        instance_number = self.instance_number_var.get()
+        date_str = self.asset_install_date_var.get().strip()
+        notes = self.asset_notes_var.get().strip()
+        
+        if not asset_id or not tul_id or not asset_type_id:
+            messagebox.showerror("Input Error", "Asset ID, TUL ID, and Asset Type are required.")
+            return
+            
+        try:
+            installation_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+        except ValueError:
+            messagebox.showerror("Input Error", "Invalid date format. Use YYYY-MM-DD.")
+            return
+            
+        success = self.db_manager.add_asset(asset_id, tul_id, asset_type_id, instance_number, installation_date, notes)
+        
+        if success:
+            self.status_var.set(f"Asset {asset_id} added successfully.")
+            self.clear_asset_form()
+            self.load_assets()
+        else:
+            messagebox.showerror("Database Error", "Failed to add Asset. It may already exist.")
+            
+    def clear_asset_form(self):
+        """Clear the asset form fields."""
+        self.asset_id_var.set("")
+        self.instance_number_var.set(1)
+        self.asset_install_date_var.set(datetime.now().strftime('%Y-%m-%d'))
+        self.asset_notes_var.set("")
+        
+    def generate_asset_id(self):
+        """Generate an asset ID based on selected TUL and asset type."""
+        tul_id = self.tul_id_var.get()
+        asset_type_id = self.asset_type_var.get()
+        instance = self.instance_number_var.get()
+        
+        if not tul_id or not asset_type_id:
+            messagebox.showerror("Input Error", "Please select a TUL and Asset Type first.")
+            return
+        
+        # Generate ID format: TUL-TYPE-INSTANCE (e.g., TUL1-INDPIN-01)
+        generated_id = f"{tul_id}-{asset_type_id}-{instance:02d}"
+        self.asset_id_var.set(generated_id)
+        
+    def load_tuls(self):
+        """Load TUL data for dropdowns."""
+        tuls = self.db_manager.get_tuls()
+        tul_ids = [""] + [tul[0] for tul in tuls]  # Add empty option for filtering
+        
+        self.tul_combo['values'] = tul_ids
+        self.filter_tul_combo['values'] = tul_ids
+        
+    def load_asset_types(self):
+        """Load asset types from the database and update UI."""
+        # Clear the existing treeview
+        for item in self.type_tree.get_children():
+            self.type_tree.delete(item)
+            
+        # Get all asset types
+        asset_types = self.db_manager.get_asset_types()
+        
+        # Update dropdown values
+        type_ids = [asset_type[0] for asset_type in asset_types]
+        self.asset_type_combo['values'] = type_ids
+        self.filter_type_combo['values'] = [""] + type_ids  # Add empty option for filtering
+        
+        if not asset_types:
+            self.status_var.set("No asset types found in the database.")
+            return
+            
+        # Add each asset type to the treeview
+        for asset_type in asset_types:
+            type_id, name, desc, threshold = asset_type
+            self.type_tree.insert("", tk.END, values=(type_id, name, desc, threshold))
+            
+        self.status_var.set(f"Loaded {len(asset_types)} asset types.")
+        
+    def load_assets(self):
+        """Load assets from the database with optional filtering."""
+        # Clear the existing treeview
+        for item in self.asset_tree.get_children():
+            self.asset_tree.delete(item)
+            
+        # Get filter values
+        tul_filter = self.filter_tul_var.get()
+        type_filter = self.filter_asset_type_var.get()
+        
+        # Get assets with filters
+        assets = self.db_manager.get_assets(
+            tul_id=tul_filter if tul_filter else None,
+            asset_type_id=type_filter if type_filter else None
+        )
+        
+        if not assets:
+            filter_text = ""
+            if tul_filter:
+                filter_text += f" for TUL '{tul_filter}'"
+            if type_filter:
+                filter_text += f" of type '{type_filter}'"
+            self.status_var.set(f"No assets found{filter_text}.")
+            return
+            
+        # Add each asset to the treeview
+        for asset in assets:
+            asset_id, tul_id, asset_type_id, instance_number, installation_date, notes, type_name, location = asset
+            self.asset_tree.insert("", tk.END, values=(asset_id, tul_id, asset_type_id, instance_number, installation_date, notes))
+            
+        self.status_var.set(f"Loaded {len(assets)} assets.")
+        
+    def apply_asset_filter(self):
+        """Apply filters to the asset list."""
+        self.load_assets()
+        
+    def clear_asset_filter(self):
+        """Clear the asset filters."""
+        self.filter_tul_var.set("")
+        self.filter_asset_type_var.set("")
+        self.load_assets()
+        
+    def view_asset_measurements(self):
+        """View measurements for the selected asset."""
+        selected_items = self.asset_tree.selection()
+        if not selected_items:
+            messagebox.showerror("Selection Error", "Please select an asset to view its measurements.")
+            return
+            
+        # Get the selected asset ID
+        asset_id = self.asset_tree.item(selected_items[0], "values")[0]
+        
+        # This would typically switch to the Maintenance tab and filter by asset
+        # For now, we'll just show a message
+        messagebox.showinfo("View Measurements", f"Viewing measurements for asset: {asset_id}")
+        
+    def delete_asset(self):
+        """Delete the selected asset after confirmation."""
+        selected_items = self.asset_tree.selection()
+        if not selected_items:
+            messagebox.showerror("Selection Error", "Please select an asset to delete.")
+            return
+            
+        # Get the selected asset ID
+        asset_id = self.asset_tree.item(selected_items[0], "values")[0]
+        
+        # Create a custom confirmation dialog
+        confirm_dialog = tk.Toplevel(self.parent)
+        confirm_dialog.title("Confirm Deletion")
+        confirm_dialog.geometry("400x200")
+        confirm_dialog.transient(self.parent)
+        confirm_dialog.grab_set()
+        confirm_dialog.resizable(False, False)
+        
+        # Dialog content
+        frame = ttk.Frame(confirm_dialog, padding="20")
+        frame.pack(fill=tk.BOTH, expand=True)
+        
+        warning_text = (
+            f"Are you sure you want to delete asset '{asset_id}'?\n\n"
+            f"You will lose ALL measurement data for this asset.\n\n"
+            f"Type 'DELETE' to confirm:"
+        )
+        
+        ttk.Label(frame, text=warning_text, wraplength=350).pack(pady=(0, 10))
+        
+        # Entry for confirmation text
+        confirmation_var = tk.StringVar()
+        confirmation_entry = ttk.Entry(frame, textvariable=confirmation_var, width=20)
+        confirmation_entry.pack(pady=5)
+        confirmation_entry.focus_set()
+        
+        # Buttons
+        button_frame = ttk.Frame(frame)
+        button_frame.pack(pady=10)
+        
+        def confirm_delete():
+            if confirmation_var.get() == "DELETE":
+                # TODO: Implement actual deletion in DatabaseManager
+                # For now, just close the dialog and refresh
+                confirm_dialog.destroy()
+                self.load_assets()
+                self.status_var.set(f"Asset '{asset_id}' deleted successfully.")
+            else:
+                messagebox.showerror("Confirmation Error", 
+                                   "Incorrect confirmation text. Type 'DELETE' exactly.")
+        
+        ttk.Button(button_frame, text="Delete", command=confirm_delete, style="Delete.TButton").pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="Cancel", command=confirm_dialog.destroy).pack(side=tk.LEFT, padx=5)
+        
+        # Handle Enter key in entry field
+        confirmation_entry.bind("<Return>", lambda event: confirm_delete())
+
+        
+
+
+================================================================================
+FILE: ui/comparison_tab.py
+================================================================================
+import tkinter as tk
+from tkinter import ttk, messagebox
+from datetime import datetime, timedelta
+import numpy as np
+import matplotlib
+matplotlib.use('TkAgg')
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from matplotlib.figure import Figure
+import statistics
+
+class ComparisonTab:
+    """Implements the Comparison Analysis tab functionality."""
+    
+    def __init__(self, parent, db_manager, prediction_model, status_var):
+        self.parent = parent
+        self.db_manager = db_manager
+        self.prediction_model = prediction_model
+        self.status_var = status_var
+        
+        # Variables for comparison controls
+        self.comparison_mode_var = tk.StringVar(value="By Asset Type")
+        self.tul_var = tk.StringVar()
+        self.asset_type_var = tk.StringVar()
+        self.time_range_var = tk.StringVar(value="All Time")
+        self.invert_y_var = tk.BooleanVar(value=True)  # Default to inverted Y-axis
+        self.highlight_outliers_var = tk.BooleanVar(value=True)
+        
+        # UI components
+        self.canvas = None
+        self.setup_ui()
+        
+    def setup_ui(self):
+        """Set up the user interface for the comparison tab."""
+        # Create main layout with control panel at top, graph below
+        control_frame = ttk.Frame(self.parent, padding="10")
+        control_frame.pack(fill=tk.X, padx=5, pady=5)
+        
+        graph_frame = ttk.Frame(self.parent, padding="10")
+        graph_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        
+        # Control panel
+        ttk.Label(control_frame, text="Comparison Analysis", style="Title.TLabel").grid(row=0, column=0, columnspan=6, sticky=tk.W, pady=5)
+        
+        # Comparison mode (radio buttons)
+        mode_frame = ttk.LabelFrame(control_frame, text="Comparison Mode")
+        mode_frame.grid(row=1, column=0, padx=5, pady=5, sticky=tk.W)
+        
+        ttk.Radiobutton(mode_frame, text="By Asset Type", variable=self.comparison_mode_var, 
+                        value="By Asset Type", command=self.update_filters).pack(anchor=tk.W, padx=5, pady=2)
+        ttk.Radiobutton(mode_frame, text="By TUL", variable=self.comparison_mode_var, 
+                        value="By TUL", command=self.update_filters).pack(anchor=tk.W, padx=5, pady=2)
+        
+        # Filters
+        filter_frame = ttk.LabelFrame(control_frame, text="Filters")
+        filter_frame.grid(row=1, column=1, padx=5, pady=5, sticky=tk.W)
+        
+        ttk.Label(filter_frame, text="TUL:").grid(row=0, column=0, sticky=tk.W, padx=5, pady=2)
+        self.tul_combo = ttk.Combobox(filter_frame, textvariable=self.tul_var, width=15, state="readonly")
+        self.tul_combo.grid(row=0, column=1, padx=5, pady=2)
+        
+        ttk.Label(filter_frame, text="Asset Type:").grid(row=1, column=0, sticky=tk.W, padx=5, pady=2)
+        self.asset_type_combo = ttk.Combobox(filter_frame, textvariable=self.asset_type_var, width=15, state="readonly")
+        self.asset_type_combo.grid(row=1, column=1, padx=5, pady=2)
+        
+        ttk.Label(filter_frame, text="Time Range:").grid(row=2, column=0, sticky=tk.W, padx=5, pady=2)
+        time_range_combo = ttk.Combobox(filter_frame, textvariable=self.time_range_var, width=15, state="readonly")
+        time_range_combo.grid(row=2, column=1, padx=5, pady=2)
+        time_range_combo['values'] = ["All Time", "Last Year", "Last 6 Months", "Last 3 Months", "Last Month"]
+        
+        # Options
+        options_frame = ttk.LabelFrame(control_frame, text="Display Options")
+        options_frame.grid(row=1, column=2, padx=5, pady=5, sticky=tk.W)
+        
+        ttk.Checkbutton(options_frame, text="Invert Y-Axis (Show Wear Downward)", 
+                        variable=self.invert_y_var).pack(anchor=tk.W, padx=5, pady=2)
+        ttk.Checkbutton(options_frame, text="Highlight Outliers", 
+                        variable=self.highlight_outliers_var).pack(anchor=tk.W, padx=5, pady=2)
+        
+        # Buttons
+        button_frame = ttk.Frame(control_frame)
+        button_frame.grid(row=1, column=3, padx=5, pady=5, sticky=tk.E)
+        
+        ttk.Button(button_frame, text="Generate Comparison", command=self.generate_comparison).pack(side=tk.TOP, pady=2)
+        ttk.Button(button_frame, text="Export Graph", command=self.export_graph).pack(side=tk.TOP, pady=2)
+        
+        # Graph frame
+        self.graph_container = ttk.Frame(graph_frame)
+        self.graph_container.pack(fill=tk.BOTH, expand=True)
+        
+        # Add default message in graph container
+        self.placeholder_label = ttk.Label(
+            self.graph_container, 
+            text="Select comparison options and click 'Generate Comparison' to visualize wear patterns",
+            font=('Arial', 11),
+            foreground='gray'
+        )
+        self.placeholder_label.pack(pady=100)
+        
+        # Load initial data
+        self.load_tuls()
+        self.load_asset_types()
+        self.update_filters()
+        
+    def load_tuls(self):
+        """Load TUL data for dropdowns."""
+        tuls = self.db_manager.get_tuls()
+        tul_ids = [row[0] for row in tuls]
+        
+        self.tul_combo['values'] = tul_ids
+        if tul_ids and not self.tul_var.get():
+            self.tul_combo.current(0)
+            
+    def load_asset_types(self):
+        """Load asset type data for dropdowns."""
+        asset_types = self.db_manager.get_asset_types()
+        asset_type_ids = [row[0] for row in asset_types]
+        
+        self.asset_type_combo['values'] = asset_type_ids
+        if asset_type_ids and not self.asset_type_var.get():
+            self.asset_type_combo.current(0)
+            
+    def update_filters(self, event=None):
+        """Update the filter options based on the comparison mode."""
+        mode = self.comparison_mode_var.get()
+        
+        if mode == "By Asset Type":
+            # When comparing by asset type, TUL can be optional
+            self.tul_combo.config(state="readonly")
+            self.asset_type_combo.config(state="readonly")
+        else:  # By TUL
+            # When comparing by TUL, asset type can be optional
+            self.tul_combo.config(state="readonly")
+            self.asset_type_combo.config(state="readonly")
+            
+    def generate_comparison(self):
+        """Generate the comparison visualization based on selected options."""
+        mode = self.comparison_mode_var.get()
+        tul_id = self.tul_var.get()
+        asset_type_id = self.asset_type_var.get()
+        time_range = self.time_range_var.get()
+        
+        # Validate selections
+        if mode == "By Asset Type" and not asset_type_id:
+            messagebox.showerror("Selection Error", "Please select an Asset Type for comparison.")
+            return
+        
+        if mode == "By TUL" and not tul_id:
+            messagebox.showerror("Selection Error", "Please select a TUL for comparison.")
+            return
+        
+        # Clear the graph container
+        for widget in self.graph_container.winfo_children():
+            widget.destroy()
+            
+        # Get the data based on comparison mode
+        if mode == "By Asset Type":
+            # Get assets of the selected type, optionally filtered by TUL
+            assets = self.db_manager.get_assets(tul_id=tul_id if tul_id else None, asset_type_id=asset_type_id)
+            
+            if not assets:
+                ttk.Label(self.graph_container, text="No assets found matching the selected criteria", 
+                          font=('Arial', 11), foreground='gray').pack(pady=100)
+                return
+                
+            title = f"{asset_type_id} Wear Comparison"
+            if tul_id:
+                title += f" in {tul_id}"
+                
+            # Get measurements for these assets
+            all_measurements = []
+            for asset in assets:
+                asset_id = asset[0]
+                measurements = self.db_manager.get_measurements(asset_id=asset_id)
+                if measurements:
+                    all_measurements.append((asset_id, measurements))
+                    
+            self.plot_comparison(all_measurements, title, time_range)
+                
+        else:  # By TUL
+            # Get assets in the selected TUL, optionally filtered by type
+            assets = self.db_manager.get_assets(tul_id=tul_id, asset_type_id=asset_type_id if asset_type_id else None)
+            
+            if not assets:
+                ttk.Label(self.graph_container, text="No assets found matching the selected criteria", 
+                          font=('Arial', 11), foreground='gray').pack(pady=100)
+                return
+                
+            title = f"{tul_id} Wear Comparison"
+            if asset_type_id:
+                title += f" for {asset_type_id} Assets"
+                
+            # Get measurements for these assets
+            all_measurements = []
+            for asset in assets:
+                asset_id = asset[0]
+                measurements = self.db_manager.get_measurements(asset_id=asset_id)
+                if measurements:
+                    all_measurements.append((asset_id, measurements))
+                    
+            self.plot_comparison(all_measurements, title, time_range)
+            
+    def plot_comparison(self, all_measurements, title, time_range):
+        """Plot the comparison chart based on measurement data."""
+        if not all_measurements:
+            ttk.Label(self.graph_container, text="No measurement data available for the selected assets", 
+                      font=('Arial', 11), foreground='gray').pack(pady=100)
+            return
+            
+        # Create figure and axis
+        fig = plt.Figure(figsize=(10, 6), dpi=100)
+        ax = fig.add_subplot(111)
+        
+        # Filter by time range if needed
+        cutoff_date = None
+        if time_range != "All Time":
+            today = datetime.now().date()
+            if time_range == "Last Year":
+                cutoff_date = today - timedelta(days=365)
+            elif time_range == "Last 6 Months":
+                cutoff_date = today - timedelta(days=180)
+            elif time_range == "Last 3 Months":
+                cutoff_date = today - timedelta(days=90)
+            elif time_range == "Last Month":
+                cutoff_date = today - timedelta(days=30)
+        
+        # Process and plot data for each asset
+        colors = plt.cm.tab10.colors
+        markers = ['o', 's', '^', 'D', 'v', '<', '>', 'p', '*', 'h']
+        
+        # First pass: collect all wear rates for outlier detection
+        all_wear_rates = []
+        processed_data = []
+        
+        for i, (asset_id, measurements) in enumerate(all_measurements):
+            # Sort by date
+            measurements.sort(key=lambda m: datetime.strptime(m[2], '%Y-%m-%d'))
+            
+            # Filter by time range if needed
+            if cutoff_date:
+                filtered_measurements = [m for m in measurements if datetime.strptime(m[2], '%Y-%m-%d').date() >= cutoff_date]
+                if filtered_measurements:
+                    measurements = filtered_measurements
+                    
+            # Skip if no measurements
+            if len(measurements) < 2:
+                continue
+                
+            # Extract dates and wear values
+            dates = [datetime.strptime(m[2], '%Y-%m-%d').date() for m in measurements]
+            wear_values = [float(m[3]) for m in measurements]
+            
+            # Calculate days since first measurement for each asset
+            start_date = dates[0]
+            days = [(date - start_date).days for date in dates]
+            
+            # Calculate wear rate (mm per day)
+            total_days = days[-1]
+            if total_days > 0:  # Avoid division by zero
+                wear_rate = (wear_values[-1] - wear_values[0]) / total_days
+                all_wear_rates.append(wear_rate)
+                
+                # Store processed data for plotting
+                processed_data.append({
+                    'asset_id': asset_id,
+                    'dates': dates,
+                    'days': days,
+                    'wear_values': wear_values,
+                    'wear_rate': wear_rate
+                })
+        
+        # Skip plotting if no valid data
+        if not processed_data:
+            ttk.Label(self.graph_container, text="No valid measurement data available for comparison", 
+                      font=('Arial', 11), foreground='gray').pack(pady=100)
+            return
+        
+        # Calculate outlier thresholds if needed
+        outlier_threshold = None
+        if self.highlight_outliers_var.get() and len(all_wear_rates) >= 3:
+            median_rate = statistics.median(all_wear_rates)
+            mad = statistics.median([abs(rate - median_rate) for rate in all_wear_rates])
+            outlier_threshold = median_rate + (3 * mad)  # Using Median Absolute Deviation
+            
+        # Second pass: plot the data
+        for i, data in enumerate(processed_data):
+            color_idx = i % len(colors)
+            marker_idx = i % len(markers)
+            
+            # Check if this asset's wear rate is an outlier
+            is_outlier = outlier_threshold and data['wear_rate'] > outlier_threshold
+            
+            # Set line properties
+            line_props = {
+                'marker': markers[marker_idx],
+                'linestyle': '-',
+                'linewidth': 2 if is_outlier else 1.5,
+                'markersize': 8 if is_outlier else 6,
+                'alpha': 0.8
+            }
+            
+            if is_outlier:
+                line_props['color'] = 'red'
+                line_props['markeredgecolor'] = 'red'
+                line_props['markeredgewidth'] = 2
+            else:
+                line_props['color'] = colors[color_idx]
+            
+            # Plot the data
+            line, = ax.plot(data['days'], data['wear_values'], **line_props, label=data['asset_id'])
+            
+            # Add annotation for outliers
+            if is_outlier:
+                ax.annotate(f"Outlier: {data['asset_id']}", 
+                           xy=(data['days'][-1], data['wear_values'][-1]),
+                           xytext=(10, 0), textcoords="offset points",
+                           ha="left", va="center", fontsize=9,
+                           bbox=dict(boxstyle="round,pad=0.3", fc="yellow", alpha=0.7))
+        
+        # Invert Y-axis if requested to show wear increasing downward
+        if self.invert_y_var.get():
+            ax.invert_yaxis()
+        
+        # Set chart properties
+        ax.set_title(title)
+        ax.set_xlabel("Days Since First Measurement")
+        ax.set_ylabel("Wear (mm)")
+        ax.grid(True, alpha=0.3)
+        
+        # Add legend
+        if len(processed_data) <= 10:
+            ax.legend(loc='best')
+        else:
+            # For many assets, move legend outside the plot
+            ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+            fig.subplots_adjust(right=0.8)
+        
+        # Create canvas for displaying the plot
+        canvas = FigureCanvasTkAgg(fig, master=self.graph_container)
+        canvas.draw()
+        canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+        
+        # Save reference to canvas for export
+        self.canvas = canvas
+        self.fig = fig
+        
+        # Update status
+        self.status_var.set(f"Comparison generated with {len(processed_data)} assets")
+        
+    def export_graph(self):
+        """Export the current graph as an image file."""
+        if not hasattr(self, 'fig') or not self.fig:
+            messagebox.showinfo("Export Error", "No graph available to export. Please generate a comparison first.")
+            return
+            
+        try:
+            # TODO: Add file dialog to choose save location
+            filename = "tul_comparison.png"
+            self.fig.savefig(filename, dpi=300, bbox_inches='tight')
+            messagebox.showinfo("Export Successful", f"Graph exported to {filename}")
+        except Exception as e:
+            messagebox.showerror("Export Error", f"Failed to export graph: {str(e)}")
+
+
+================================================================================
+FILE: ui/data_tab.py
+================================================================================
+# File: ui/data_tab.py
+
+import tkinter as tk
+from tkinter import ttk, messagebox, filedialog
+import pandas as pd
+from datetime import datetime
+
+
+
+class DataManagementTab:
+    """Implements the Data Management tab functionality."""
+    
+    def __init__(self, parent, db_manager, status_var):
+        self.parent = parent
+        self.db_manager = db_manager
+        self.status_var = status_var
+        self.indexer_var = tk.StringVar()
+        self.location_var = tk.StringVar()
+        self.installation_date_var = tk.StringVar()
+        self.notes_var = tk.StringVar()
+        self.setup_ui()
+
+
+        
+        
+    def setup_ui(self):
+        """Set up the user interface for the data tab."""
+        # Create main frames
+        left_frame = ttk.Frame(self.parent, padding="10")
+        left_frame.pack(side=tk.LEFT, fill=tk.Y, padx=5, pady=5)
+        
+        right_frame = ttk.Frame(self.parent, padding="10")
+        right_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=5, pady=5)
+        
+        # Left frame - Data Management Controls
+        ttk.Label(left_frame, text="Data Management", font=('Arial', 12, 'bold')).pack(anchor=tk.W, pady=5)
+        ttk.Separator(left_frame, orient=tk.HORIZONTAL).pack(fill=tk.X, pady=5)
+        
+        # Indexer Management Section
+        ttk.Label(left_frame, text="Indexer Management", font=('Arial', 11)).pack(anchor=tk.W, pady=5)
+        
+        indexer_frame = ttk.LabelFrame(left_frame, text="Add New Indexer")
+        indexer_frame.pack(fill=tk.X, padx=5, pady=5)
+        
+        ttk.Label(indexer_frame, text="Indexer ID:").grid(row=0, column=0, sticky=tk.W, padx=5, pady=2)
+        ttk.Entry(indexer_frame, textvariable=self.indexer_var, width=20).grid(row=0, column=1, padx=5, pady=2)
+        
+        ttk.Label(indexer_frame, text="Location:").grid(row=1, column=0, sticky=tk.W, padx=5, pady=2)
+        ttk.Entry(indexer_frame, textvariable=self.location_var, width=20).grid(row=1, column=1, padx=5, pady=2)
+        
+        ttk.Label(indexer_frame, text="Installation Date:").grid(row=2, column=0, sticky=tk.W, padx=5, pady=2)
+        date_entry = ttk.Entry(indexer_frame, textvariable=self.installation_date_var, width=20)
+        date_entry.grid(row=2, column=1, padx=5, pady=2)
+        date_entry.insert(0, datetime.now().strftime('%Y-%m-%d'))
+        
+        ttk.Label(indexer_frame, text="Notes:").grid(row=3, column=0, sticky=tk.W, padx=5, pady=2)
+        ttk.Entry(indexer_frame, textvariable=self.notes_var, width=20).grid(row=3, column=1, padx=5, pady=2)
+        
+        button_frame = ttk.Frame(indexer_frame)
+        button_frame.grid(row=4, column=0, columnspan=2, pady=5)
+        
+        ttk.Button(button_frame, text="Add Indexer", command=self.add_indexer).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="Clear Form", command=self.clear_indexer_form).pack(side=tk.LEFT, padx=5)
+        
+        # Measurement Management Section
+        ttk.Separator(left_frame, orient=tk.HORIZONTAL).pack(fill=tk.X, pady=10)
+        ttk.Label(left_frame, text="Measurement Management", font=('Arial', 11)).pack(anchor=tk.W, pady=5)
+        
+        measurement_frame = ttk.LabelFrame(left_frame, text="Add New Measurement")
+        measurement_frame.pack(fill=tk.X, padx=5, pady=5)
+        
+        ttk.Label(measurement_frame, text="Select Indexer:").grid(row=0, column=0, sticky=tk.W, padx=5, pady=2)
+        self.indexer_combo = ttk.Combobox(measurement_frame, width=18, state="readonly")
+        self.indexer_combo.grid(row=0, column=1, padx=5, pady=2)
+        
+        ttk.Label(measurement_frame, text="Measurement Date:").grid(row=1, column=0, sticky=tk.W, padx=5, pady=2)
+        self.measurement_date_var = tk.StringVar(value=datetime.now().strftime('%Y-%m-%d'))
+        date_entry = ttk.Entry(measurement_frame, textvariable=self.measurement_date_var, width=20)
+        date_entry.grid(row=1, column=1, padx=5, pady=2)
+        
+        ttk.Label(measurement_frame, text="Wear Value (mm):").grid(row=2, column=0, sticky=tk.W, padx=5, pady=2)
+        self.wear_var = tk.DoubleVar()
+        ttk.Spinbox(measurement_frame, from_=0, to=50, increment=0.1, textvariable=self.wear_var, width=18).grid(row=2, column=1, padx=5, pady=2)
+        
+        ttk.Label(measurement_frame, text="Shims Added:").grid(row=3, column=0, sticky=tk.W, padx=5, pady=2)
+        self.shims_var = tk.DoubleVar()
+        ttk.Spinbox(measurement_frame, from_=0, to=20, increment=0.5, textvariable=self.shims_var, width=18).grid(row=3, column=1, padx=5, pady=2)
+        
+        ttk.Label(measurement_frame, text="Notes:").grid(row=4, column=0, sticky=tk.W, padx=5, pady=2)
+        self.measurement_notes_var = tk.StringVar() 
+        ttk.Entry(measurement_frame, textvariable=self.measurement_notes_var, width=20).grid(row=4, column=1, padx=5, pady=2)
+        
+        button_frame = ttk.Frame(measurement_frame)
+        button_frame.grid(row=5, column=0, columnspan=2, pady=5)
+        
+        ttk.Button(button_frame, text="Add Measurement", command=self.add_measurement).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="Clear Form", command=self.clear_measurement_form).pack(side=tk.LEFT, padx=5)
+        
+        # Data Import/Export Section
+        ttk.Separator(left_frame, orient=tk.HORIZONTAL).pack(fill=tk.X, pady=10)
+        ttk.Label(left_frame, text="Data Import/Export", font=('Arial', 11)).pack(anchor=tk.W, pady=5)
+        
+        import_export_frame = ttk.Frame(left_frame)
+        import_export_frame.pack(fill=tk.X, padx=5, pady=5)
+        
+        ttk.Button(import_export_frame, text="Import from CSV", command=self.import_from_csv).pack(fill=tk.X, pady=2)
+        ttk.Button(import_export_frame, text="Export to CSV", command=self.export_to_csv).pack(fill=tk.X, pady=2)
+        
+        # Right frame - Data Display
+        ttk.Label(right_frame, text="Indexer Data", font=('Arial', 12, 'bold')).pack(anchor=tk.W, pady=5)
+        
+        # Indexer selection for viewing
+        selection_frame = ttk.Frame(right_frame)
+        selection_frame.pack(fill=tk.X, pady=5)
+        
+        ttk.Label(selection_frame, text="Select Indexer:").pack(side=tk.LEFT, padx=5)
+        self.view_indexer_combo = ttk.Combobox(selection_frame, width=20, state="readonly")
+        self.view_indexer_combo.pack(side=tk.LEFT, padx=5)
+        
+        ttk.Button(selection_frame, text="View Data", command=self.view_indexer_data).pack(side=tk.LEFT, padx=5)
+        ttk.Button(selection_frame, text="View All", command=self.view_all_data).pack(side=tk.LEFT, padx=5)
+
+        # Delete Indexer button
+        style = ttk.Style()
+        style.configure("Delete.TButton", foreground="red")
+        ttk.Button(selection_frame, text="Delete Indexer", 
+          command=self.delete_indexer, 
+          style="Delete.TButton").pack(side=tk.LEFT, padx=5)
+
+        # Treeview for data display
+        self.tree_frame = ttk.Frame(right_frame)
+        self.tree_frame.pack(fill=tk.BOTH, expand=True, pady=5)
+        
+        # Create Treeview widget
+        self.tree = ttk.Treeview(self.tree_frame, columns=("Date", "Wear", "Shims", "Notes"), show="headings")
+        self.tree.heading("Date", text="Measurement Date")
+        self.tree.heading("Wear", text="Wear Value (mm)")
+        self.tree.heading("Shims", text="Shims Added")
+        self.tree.heading("Notes", text="Notes")
+        
+        self.tree.column("Date", width=120)
+        self.tree.column("Wear", width=100)
+        self.tree.column("Shims", width=100)
+        self.tree.column("Notes", width=200)
+        
+        # Add scrollbar
+        scrollbar = ttk.Scrollbar(self.tree_frame, orient=tk.VERTICAL, command=self.tree.yview)
+        self.tree.configure(yscrollcommand=scrollbar.set)
+        
+        self.tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        # Load the initial data
+        self.refresh_indexer_lists()
+        
+    def refresh_indexer_lists(self):
+        """Refresh all comboboxes with current indexer IDs."""
+        indexers = self.db_manager.get_indexers()
+        indexer_ids = [row[0] for row in indexers]
+        
+        # Update comboboxes
+        self.indexer_combo['values'] = indexer_ids
+        self.view_indexer_combo['values'] = indexer_ids
+        
+        # Set default selection if available
+        if indexer_ids:
+            if not self.indexer_combo.get():
+                self.indexer_combo.current(0)
+            if not self.view_indexer_combo.get():
+                self.view_indexer_combo.current(0)
+                
+    def add_indexer(self):
+        """Add a new indexer to the database."""
+        indexer_id = self.indexer_var.get().strip()
+        location = self.location_var.get().strip()
+        date_str = self.installation_date_var.get().strip()
+        notes = self.notes_var.get().strip()
+        
+        if not indexer_id:
+            messagebox.showerror("Input Error", "Indexer ID is required.")
+            return
+            
+        try:
+            installation_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+        except ValueError:
+            messagebox.showerror("Input Error", "Invalid date format. Use YYYY-MM-DD.")
+            return
+            
+        success = self.db_manager.add_indexer(indexer_id, location, installation_date, notes)
+        
+        if success:
+            self.status_var.set(f"Indexer {indexer_id} added successfully.")
+            self.clear_indexer_form()
+            self.refresh_indexer_lists()
+        else:
+            messagebox.showerror("Database Error", "Failed to add indexer. It may already exist.")
+            
+    def clear_indexer_form(self):
+        """Clear the indexer form fields."""
+        self.indexer_var.set("")
+        self.location_var.set("")
+        self.installation_date_var.set(datetime.now().strftime('%Y-%m-%d'))
+        self.notes_var.set("")
+        
+    def add_measurement(self):
+        """Add a new measurement to the database."""
+        indexer_id = self.indexer_combo.get()
+        date_str = self.measurement_date_var.get().strip()
+        wear_value = self.wear_var.get()
+        shims_added = self.shims_var.get()
+        notes = self.measurement_notes_var.get().strip()
+        
+        if not indexer_id:
+            messagebox.showerror("Input Error", "Please select an indexer.")
+            return
+            
+        try:
+            measurement_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+        except ValueError:
+            messagebox.showerror("Input Error", "Invalid date format. Use YYYY-MM-DD.")
+            return
+            
+        success = self.db_manager.add_measurement(
+            indexer_id, measurement_date, wear_value, shims_added, notes)
+        
+        if success:
+            self.status_var.set(f"Measurement added for {indexer_id}.")
+            self.clear_measurement_form()
+            
+            # Refresh view if current indexer is being viewed
+            if self.view_indexer_combo.get() == indexer_id:
+                self.view_indexer_data()
+        else:
+            messagebox.showerror("Database Error", "Failed to add measurement.")
+            
+    def clear_measurement_form(self):
+        """Clear the measurement form fields."""
+        self.measurement_date_var.set(datetime.now().strftime('%Y-%m-%d'))
+        self.wear_var.set(0.0)
+        self.shims_var.set(0.0)
+        self.measurement_notes_var.set("")
+        
+    def view_indexer_data(self):
+        """View data for the selected indexer."""
+        indexer_id = self.view_indexer_combo.get()
+        
+        if not indexer_id:
+            messagebox.showerror("Selection Error", "Please select an indexer to view.")
+            return
+            
+        # Clear existing data
+        for item in self.tree.get_children():
+            self.tree.delete(item)
+            
+        # Get measurements for this indexer
+        measurements = self.db_manager.get_measurements(indexer_id)
+        
+        if not measurements:
+            self.status_var.set(f"No data found for indexer {indexer_id}.")
+            return
+            
+        # Add data to treeview
+        for row in measurements:
+            # row format: [measurement_id, indexer_id, date, wear, shims, notes]
+            date_str = row[2]
+            wear = float(row[3])
+            shims = float(row[4])
+            notes = row[5] or ""
+            
+            self.tree.insert("", tk.END, values=(date_str, f"{wear:.2f}", f"{shims:.1f}", notes))
+            
+        self.status_var.set(f"Displaying data for indexer {indexer_id}.")
+        
+    def view_all_data(self):
+        """View data for all indexers."""
+        # Clear existing data
+        for item in self.tree.get_children():
+            self.tree.delete(item)
+            
+        # Get all measurements
+        measurements = self.db_manager.get_measurements()
+        
+        if not measurements:
+            self.status_var.set("No data found in the database.")
+            return
+            
+        # Add data to treeview
+        for row in measurements:
+            # row format: [measurement_id, indexer_id, date, wear, shims, notes]
+            indexer_id = row[1]
+            date_str = row[2]
+            wear = float(row[3])
+            shims = float(row[4])
+            notes = row[5] or ""
+            
+            # Include indexer ID in display for all data view
+            display_notes = f"[{indexer_id}] {notes}"
+            
+            self.tree.insert("", tk.END, values=(date_str, f"{wear:.2f}", f"{shims:.1f}", display_notes))
+            
+        self.status_var.set("Displaying data for all indexers.")
+        
+    def import_from_csv(self):
+        """Import data from a CSV file."""
+        filename = filedialog.askopenfilename(
+            title="Select CSV File to Import",
+            filetypes=[("CSV files", "*.csv"), ("All files", "*.*")]
+        )
+        
+        if not filename:
+            return
+            
+        try:
+            success = self.db_manager.import_from_csv(filename)
+            if success:
+                self.refresh_indexer_lists()
+                self.status_var.set(f"Data imported successfully from {filename}")
+                messagebox.showinfo("Import Successful", "Data has been imported from the CSV file.")
+            else:
+                messagebox.showerror("Import Error", "Failed to import data from CSV.")
+        except Exception as e:
+            messagebox.showerror("Import Error", f"Error importing data: {str(e)}")
+            
+    def export_to_csv(self):
+        """Export data to a CSV file."""
+        indexer_id = self.view_indexer_combo.get()
+        
+        # Determine export mode (all or specific indexer)
+        if not indexer_id:
+            export_all = messagebox.askyesno("Export Selection", 
+                "No indexer selected. Export data for all indexers?")
+            if not export_all:
+                return
+            selected_indexer = None
+        else:
+            export_selected = messagebox.askyesno("Export Selection",
+                f"Export data for indexer {indexer_id} only?")
+            selected_indexer = indexer_id if export_selected else None
+        
+        # Get file path for export
+        filename = filedialog.asksaveasfilename(
+            title="Save CSV File",
+            defaultextension=".csv",
+            filetypes=[("CSV files", "*.csv"), ("All files", "*.*")]
+        )
+        
+        if not filename:
+            return
+            
+        try:
+            success = self.db_manager.export_to_csv(filename, selected_indexer)
+            if success:
+                self.status_var.set(f"Data exported successfully to {filename}")
+                messagebox.showinfo("Export Successful", "Data has been exported to the CSV file.")
+            else:
+                messagebox.showerror("Export Error", "Failed to export data to CSV.")
+        except Exception as e:
+            messagebox.showerror("Export Error", f"Error exporting data: {str(e)}")
+
+    def delete_indexer(self):
+        """Delete the selected indexer after confirmation."""
+        indexer_id = self.view_indexer_combo.get()
+        
+        if not indexer_id:
+            messagebox.showerror("Selection Error", "Please select an indexer to delete.")
+            return
+            
+        # Create a custom confirmation dialog
+        confirm_dialog = tk.Toplevel(self.parent)
+        confirm_dialog.title("Confirm Deletion")
+        confirm_dialog.geometry("400x200")
+        confirm_dialog.transient(self.parent)
+        confirm_dialog.grab_set()
+        confirm_dialog.resizable(False, False)
+        
+        # Dialog content
+        frame = ttk.Frame(confirm_dialog, padding="20")
+        frame.pack(fill=tk.BOTH, expand=True)
+        
+        warning_text = (
+            f"Are you sure you want to delete '{indexer_id}'?\n\n"
+            f"You will lose ALL data on this indexer, including maintenance history.\n\n"
+            f"Type 'DELETE' to confirm:"
+        )
+        
+        ttk.Label(frame, text=warning_text, wraplength=350).pack(pady=(0, 10))
+        
+        # Entry for confirmation text
+        confirmation_var = tk.StringVar()
+        confirmation_entry = ttk.Entry(frame, textvariable=confirmation_var, width=20)
+        confirmation_entry.pack(pady=5)
+        confirmation_entry.focus_set()
+        
+        # Buttons
+        button_frame = ttk.Frame(frame)
+        button_frame.pack(pady=10)
+        
+        def confirm_delete():
+            if confirmation_var.get() == "DELETE":
+                success = self.db_manager.delete_indexer(indexer_id)
+                if success:
+                    self.status_var.set(f"Indexer '{indexer_id}' and all associated data deleted.")
+                    self.refresh_indexer_lists()
+                    confirm_dialog.destroy()
+                    # Clear the tree view
+                    for item in self.tree.get_children():
+                        self.tree.delete(item)
+                else:
+                    messagebox.showerror("Deletion Error", 
+                                    f"Failed to delete indexer '{indexer_id}'. Please try again.")
+            else:
+                messagebox.showerror("Confirmation Error", 
+                                "Incorrect confirmation text. Type 'DELETE' exactly.")
+        
+        ttk.Button(button_frame, text="Delete", command=confirm_delete, style="Delete.TButton").pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="Cancel", command=confirm_dialog.destroy).pack(side=tk.LEFT, padx=5)
+        
+        # Handle Enter key in entry field
+        confirmation_entry.bind("<Return>", lambda event: confirm_delete())
+        
+        # Handle window close event
+        confirm_dialog.protocol("WM_DELETE_WINDOW", confirm_dialog.destroy)
+
+
+
+
+================================================================================
+FILE: ui/maintenance_tab.py
+================================================================================
+import tkinter as tk
+from tkinter import ttk, messagebox
+from datetime import datetime
+
+class MaintenanceTab:
+    """Implements the Maintenance Records tab functionality for the expanded asset system."""
+    
+    def __init__(self, parent, db_manager, status_var):
+        self.parent = parent
+        self.db_manager = db_manager
+        self.status_var = status_var
+        
+        # Variables for maintenance form
+        self.tul_var = tk.StringVar()
+        self.asset_type_var = tk.StringVar()
+        self.asset_var = tk.StringVar()
+        self.wear_var = tk.DoubleVar(value=0.0)
+        self.shims_var = tk.DoubleVar(value=0.0)
+        self.notes_var = tk.StringVar()
+        self.date_var = tk.StringVar(value=datetime.now().strftime('%Y-%m-%d'))
+        
+        # Variables for filtering
+        self.filter_tul_var = tk.StringVar()
+        self.filter_asset_type_var = tk.StringVar()
+        self.filter_asset_var = tk.StringVar()
+        
+        # Create the UI
+        self.setup_ui()
+        
+    def setup_ui(self):
+        """Set up the user interface for the maintenance tab."""
+        # Create main layout: left panel for input, right panel for display
+        left_frame = ttk.Frame(self.parent, padding="10")
+        left_frame.pack(side=tk.LEFT, fill=tk.Y, padx=5, pady=5)
+        right_frame = ttk.Frame(self.parent, padding="10")
+        right_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=5, pady=5)
+    
+        style = ttk.Style()
+        style.configure("Delete.TButton", foreground="red")
+
+        # Left frame - Maintenance Records Input
+        ttk.Label(left_frame, text="Add Maintenance Record", style="Title.TLabel").pack(anchor=tk.W, pady=5)
+        
+        # Asset selection and data entry
+        input_frame = ttk.LabelFrame(left_frame, text="Maintenance Details")
+        input_frame.pack(fill=tk.X, padx=5, pady=5)
+        
+        # TUL, Asset Type, and Asset selection
+        ttk.Label(input_frame, text="TUL:").grid(row=0, column=0, sticky=tk.W, padx=5, pady=5)
+        self.tul_combo = ttk.Combobox(input_frame, textvariable=self.tul_var, width=15, state="readonly")
+        self.tul_combo.grid(row=0, column=1, padx=5, pady=5)
+        self.tul_combo.bind("<<ComboboxSelected>>", self.on_tul_selected)
+        
+        ttk.Label(input_frame, text="Asset Type:").grid(row=1, column=0, sticky=tk.W, padx=5, pady=5)
+        self.asset_type_combo = ttk.Combobox(input_frame, textvariable=self.asset_type_var, width=15, state="readonly")
+        self.asset_type_combo.grid(row=1, column=1, padx=5, pady=5)
+        self.asset_type_combo.bind("<<ComboboxSelected>>", self.on_asset_type_selected)
+        
+        ttk.Label(input_frame, text="Asset:").grid(row=2, column=0, sticky=tk.W, padx=5, pady=5)
+        self.asset_combo = ttk.Combobox(input_frame, textvariable=self.asset_var, width=15, state="readonly")
+        self.asset_combo.grid(row=2, column=1, padx=5, pady=5)
+        
+        # Measurement details
+        ttk.Label(input_frame, text="Date:").grid(row=3, column=0, sticky=tk.W, padx=5, pady=5)
+        date_entry = ttk.Entry(input_frame, textvariable=self.date_var, width=15)
+        date_entry.grid(row=3, column=1, padx=5, pady=5)
+        
+        ttk.Label(input_frame, text="Wear Measurement (mm):").grid(row=4, column=0, sticky=tk.W, padx=5, pady=5)
+        ttk.Spinbox(input_frame, from_=0, to=100, increment=0.1, textvariable=self.wear_var, width=15).grid(row=4, column=1, padx=5, pady=5)
+        
+        ttk.Label(input_frame, text="Shims Added:").grid(row=5, column=0, sticky=tk.W, padx=5, pady=5)
+        ttk.Spinbox(input_frame, from_=0, to=20, increment=0.5, textvariable=self.shims_var, width=15).grid(row=5, column=1, padx=5, pady=5)
+        
+        ttk.Label(input_frame, text="Notes:").grid(row=6, column=0, sticky=tk.W, padx=5, pady=5)
+        ttk.Entry(input_frame, textvariable=self.notes_var, width=20).grid(row=6, column=1, padx=5, pady=5)
+        
+        # Add buttons
+        button_frame = ttk.Frame(left_frame)
+        button_frame.pack(fill=tk.X, pady=10)
+        
+        ttk.Button(button_frame, text="Add Record", command=self.add_maintenance_record).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="Clear Form", command=self.clear_form).pack(side=tk.LEFT, padx=5)
+        
+        # Right frame - Maintenance History Display
+        ttk.Label(right_frame, text="Maintenance History", style="Title.TLabel").pack(anchor=tk.W, pady=5)
+        
+        # Filter controls
+        filter_frame = ttk.Frame(right_frame)
+        filter_frame.pack(fill=tk.X, pady=5)
+        
+        ttk.Label(filter_frame, text="Filter by TUL:").pack(side=tk.LEFT, padx=5)
+        self.filter_tul_combo = ttk.Combobox(filter_frame, textvariable=self.filter_tul_var, width=10, state="readonly")
+        self.filter_tul_combo.pack(side=tk.LEFT, padx=5)
+        self.filter_tul_combo.bind("<<ComboboxSelected>>", self.on_filter_tul_selected)
+        
+        ttk.Label(filter_frame, text="Asset Type:").pack(side=tk.LEFT, padx=5)
+        self.filter_type_combo = ttk.Combobox(filter_frame, textvariable=self.filter_asset_type_var, width=10, state="readonly")
+        self.filter_type_combo.pack(side=tk.LEFT, padx=5)
+        self.filter_type_combo.bind("<<ComboboxSelected>>", self.on_filter_type_selected)
+        
+        ttk.Label(filter_frame, text="Asset:").pack(side=tk.LEFT, padx=5)
+        self.filter_asset_combo = ttk.Combobox(filter_frame, textvariable=self.filter_asset_var, width=15, state="readonly")
+        self.filter_asset_combo.pack(side=tk.LEFT, padx=5)
+        
+        ttk.Button(filter_frame, text="Apply Filter", command=self.filter_records).pack(side=tk.LEFT, padx=5)
+        ttk.Button(filter_frame, text="Clear Filters", command=self.clear_filters).pack(side=tk.LEFT, padx=5)
+        
+        # Create a Treeview for maintenance records
+        self.tree_frame = ttk.Frame(right_frame)
+        self.tree_frame.pack(fill=tk.BOTH, expand=True, pady=5)
+        
+        columns = ("date", "tul", "asset_type", "asset", "wear", "shims", "notes")
+        self.history_tree = ttk.Treeview(self.tree_frame, columns=columns, show="headings", selectmode="browse")
+        
+        # Define column headings
+        self.history_tree.heading("date", text="Date")
+        self.history_tree.heading("tul", text="TUL")
+        self.history_tree.heading("asset_type", text="Asset Type")
+        self.history_tree.heading("asset", text="Asset")
+        self.history_tree.heading("wear", text="Wear (mm)")
+        self.history_tree.heading("shims", text="Shims Added")
+        self.history_tree.heading("notes", text="Notes")
+        
+        # Define column widths
+        self.history_tree.column("date", width=90)
+        self.history_tree.column("tul", width=70)
+        self.history_tree.column("asset_type", width=90)
+        self.history_tree.column("asset", width=100)
+        self.history_tree.column("wear", width=80)
+        self.history_tree.column("shims", width=80)
+        self.history_tree.column("notes", width=200, stretch=tk.YES)
+
+        # Add a scrollbar
+        scrollbar = ttk.Scrollbar(self.tree_frame, orient=tk.VERTICAL, command=self.history_tree.yview)
+        self.history_tree.configure(yscrollcommand=scrollbar.set)
+        
+        self.history_tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        # Add context menu
+        self.context_menu = tk.Menu(self.history_tree, tearoff=0)
+        self.context_menu.add_command(label="View Details", command=self.view_record_details)
+        self.context_menu.add_separator()
+        self.context_menu.add_command(label="Delete Record", command=self.delete_record)
+        
+        self.history_tree.bind("<Button-3>", self.show_context_menu)
+        self.history_tree.bind("<Delete>", lambda event: self.delete_record())
+
+        # Create a button panel for record operations
+        button_panel = ttk.Frame(right_frame)
+        button_panel.pack(fill=tk.X, pady=5)
+
+        ttk.Button(button_panel, text="View Details", command=self.view_record_details).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_panel, text="Delete Record", command=self.delete_record, 
+                style="Delete.TButton").pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_panel, text="Refresh", command=self.load_all_maintenance_records).pack(side=tk.RIGHT, padx=5)
+        
+        # Load the initial data
+        self.refresh_dropdowns()
+        self.load_all_maintenance_records()
+        
+    def refresh_dropdowns(self):
+        """Refresh all dropdown lists."""
+        # Load TULs
+        tuls = self.db_manager.get_tuls()
+        tul_ids = [row[0] for row in tuls]
+        
+        self.tul_combo['values'] = tul_ids
+        self.filter_tul_combo['values'] = [""] + tul_ids  # Add empty option for filtering
+        
+        # Load Asset Types
+        asset_types = self.db_manager.get_asset_types()
+        asset_type_ids = [row[0] for row in asset_types]
+        
+        self.asset_type_combo['values'] = asset_type_ids
+        self.filter_type_combo['values'] = [""] + asset_type_ids  # Add empty option for filtering
+        
+    def on_tul_selected(self, event=None):
+        """Handle TUL selection to update asset list."""
+        tul_id = self.tul_var.get()
+        asset_type_id = self.asset_type_var.get()
+        
+        if tul_id:
+            self.update_asset_list(tul_id, asset_type_id)
+    
+    def on_asset_type_selected(self, event=None):
+        """Handle asset type selection to update asset list."""
+        tul_id = self.tul_var.get()
+        asset_type_id = self.asset_type_var.get()
+        
+        if asset_type_id:
+            self.update_asset_list(tul_id, asset_type_id)
+    
+    def update_asset_list(self, tul_id=None, asset_type_id=None):
+        """Update the asset dropdown based on selected TUL and/or asset type."""
+        assets = self.db_manager.get_assets(tul_id=tul_id, asset_type_id=asset_type_id)
+        asset_ids = [asset[0] for asset in assets]
+        
+        self.asset_combo['values'] = asset_ids
+        if asset_ids:
+            self.asset_combo.current(0)
+        else:
+            self.asset_var.set("")
+    
+    def on_filter_tul_selected(self, event=None):
+        """Handle filter TUL selection."""
+        tul_id = self.filter_tul_var.get()
+        asset_type_id = self.filter_asset_type_var.get()
+        
+        # Update asset type options if needed
+        if tul_id:
+            assets = self.db_manager.get_assets(tul_id=tul_id)
+            asset_types = set(asset[2] for asset in assets)
+            self.filter_type_combo['values'] = [""] + list(asset_types)
+        
+        # Update asset list
+        self.update_filter_asset_list(tul_id, asset_type_id)
+    
+    def on_filter_type_selected(self, event=None):
+        """Handle filter asset type selection."""
+        tul_id = self.filter_tul_var.get()
+        asset_type_id = self.filter_asset_type_var.get()
+        
+        # Update TUL options if needed
+        if asset_type_id and not tul_id:
+            assets = self.db_manager.get_assets(asset_type_id=asset_type_id)
+            tuls = set(asset[1] for asset in assets)
+            self.filter_tul_combo['values'] = [""] + list(tuls)
+        
+        # Update asset list
+        self.update_filter_asset_list(tul_id, asset_type_id)
+    
+    def update_filter_asset_list(self, tul_id=None, asset_type_id=None):
+        """Update the filter asset dropdown based on selected TUL and/or asset type."""
+        assets = self.db_manager.get_assets(
+            tul_id=tul_id if tul_id else None,
+            asset_type_id=asset_type_id if asset_type_id else None
+        )
+        asset_ids = [asset[0] for asset in assets]
+        
+        self.filter_asset_combo['values'] = [""] + asset_ids
+        self.filter_asset_var.set("")
+    
+    def add_maintenance_record(self):
+        """Add a new maintenance record."""
+        asset_id = self.asset_var.get()
+        if not asset_id:
+            messagebox.showerror("Input Error", "Please select an asset.")
+            return
+            
+        date_str = self.date_var.get().strip()
+        try:
+            date = datetime.strptime(date_str, '%Y-%m-%d').date()
+        except ValueError:
+            messagebox.showerror("Input Error", "Invalid date format. Please use YYYY-MM-DD.")
+            return
+            
+        wear = self.wear_var.get()
+        shims = self.shims_var.get()
+        notes = self.notes_var.get()
+        
+        # Add to database
+        success = self.db_manager.add_measurement(asset_id, date, wear, shims, notes)
+        
+        if success:
+            self.status_var.set(f"Maintenance record added for {asset_id}")
+            self.clear_form()
+            self.load_all_maintenance_records()
+        else:
+            messagebox.showerror("Database Error", "Failed to add maintenance record.")
+            
+    def clear_form(self):
+            """Clear the maintenance form."""
+            self.wear_var.set(0.0)
+            self.shims_var.set(0.0)
+            self.notes_var.set("")
+            self.date_var.set(datetime.now().strftime('%Y-%m-%d'))
+    
+    def filter_records(self):
+        """Apply filters to show specific maintenance records."""
+        self.load_filtered_records()
+        
+    def clear_filters(self):
+        """Clear all filters and show all records."""
+        self.filter_tul_var.set("")
+        self.filter_asset_type_var.set("")
+        self.filter_asset_var.set("")
+        self.load_all_maintenance_records()
+    
+    def load_filtered_records(self):
+        """Load maintenance records with the current filters applied."""
+        # Clear existing data
+        for item in self.history_tree.get_children():
+            self.history_tree.delete(item)
+            
+        # Get filter values
+        tul_id = self.filter_tul_var.get() if self.filter_tul_var.get() else None
+        asset_type_id = self.filter_asset_type_var.get() if self.filter_asset_type_var.get() else None
+        asset_id = self.filter_asset_var.get() if self.filter_asset_var.get() else None
+        
+        # Build filter description
+        filter_desc = ""
+        if asset_id:
+            filter_desc = f"for asset '{asset_id}'"
+        elif tul_id and asset_type_id:
+            filter_desc = f"for {asset_type_id} assets in {tul_id}"
+        elif tul_id:
+            filter_desc = f"for all assets in {tul_id}"
+        elif asset_type_id:
+            filter_desc = f"for all {asset_type_id} assets"
+        
+        # Get measurements with filters
+        measurements = self.db_manager.get_measurements(
+            asset_id=asset_id,
+            tul_id=tul_id,
+            asset_type_id=asset_type_id
+        )
+        
+        if not measurements:
+            self.status_var.set(f"No maintenance records found {filter_desc}")
+            return
+            
+        # Sort by date (newest first)
+        measurements.sort(key=lambda m: datetime.strptime(m[2], '%Y-%m-%d'), reverse=True)
+        
+        # Add to treeview
+        for m in measurements:
+            measurement_id = m[0]
+            asset_id = m[1]
+            date = m[2]
+            wear = float(m[3])
+            shims = float(m[4])
+            notes = m[5] or ""
+            tul_id = m[6]
+            asset_type_id = m[7]
+            
+            self.history_tree.insert("", tk.END, iid=str(measurement_id),
+                                    values=(date, tul_id, asset_type_id, asset_id, f"{wear:.1f}", f"{shims:.1f}", notes))
+            
+        self.status_var.set(f"Showing {len(measurements)} maintenance records {filter_desc}")
+        
+    def load_all_maintenance_records(self):
+        """Load all maintenance records into the treeview."""
+        # Clear existing data
+        for item in self.history_tree.get_children():
+            self.history_tree.delete(item)
+            
+        # Get all measurements
+        measurements = self.db_manager.get_measurements()
+        
+        if not measurements:
+            self.status_var.set("No maintenance records found")
+            return
+            
+        # Sort by date (newest first)
+        measurements.sort(key=lambda m: datetime.strptime(m[2], '%Y-%m-%d'), reverse=True)
+        
+        # Add to treeview
+        for m in measurements:
+            measurement_id = m[0]
+            asset_id = m[1]
+            date = m[2]
+            wear = float(m[3])
+            shims = float(m[4])
+            notes = m[5] or ""
+            tul_id = m[6]
+            asset_type_id = m[7]
+            
+            self.history_tree.insert("", tk.END, iid=str(measurement_id),
+                                    values=(date, tul_id, asset_type_id, asset_id, f"{wear:.1f}", f"{shims:.1f}", notes))
+            
+        self.status_var.set(f"Showing all maintenance records ({len(measurements)} total)")
+        
+    def show_context_menu(self, event):
+        """Show the context menu on right-click."""
+        item = self.history_tree.identify_row(event.y)
+        if item:
+            self.history_tree.selection_set(item)
+            self.context_menu.post(event.x_root, event.y_root)
+            
+    def view_record_details(self):
+        """View details of the selected maintenance record."""
+        selected_item = self.history_tree.selection()
+        if not selected_item:
+            return
+            
+        record_id = selected_item[0]
+        values = self.history_tree.item(record_id, "values")
+        
+        # Create a details window
+        details_window = tk.Toplevel(self.parent)
+        details_window.title("Maintenance Record Details")
+        details_window.geometry("400x320")
+        details_window.transient(self.parent)
+        details_window.grab_set()
+        
+        # Display details
+        detail_frame = ttk.Frame(details_window, padding=20)
+        detail_frame.pack(fill=tk.BOTH, expand=True)
+        
+        ttk.Label(detail_frame, text="Maintenance Record Details", font=('Arial', 12, 'bold')).pack(anchor=tk.W, pady=10)
+        
+        details = [
+            ("Date:", values[0]),
+            ("TUL:", values[1]),
+            ("Asset Type:", values[2]),
+            ("Asset ID:", values[3]),
+            ("Wear Measurement:", f"{values[4]} mm"),
+            ("Shims Added:", values[5]),
+            ("Notes:", values[6])
+        ]
+        
+        for i, (label, value) in enumerate(details):
+            row_frame = ttk.Frame(detail_frame)
+            row_frame.pack(fill=tk.X, pady=5)
+            
+            ttk.Label(row_frame, text=label, width=15, font=('Arial', 10, 'bold')).pack(side=tk.LEFT)
+            ttk.Label(row_frame, text=value, wraplength=250).pack(side=tk.LEFT, padx=5)
+        
+        # Add close button
+        ttk.Button(detail_frame, text="Close", command=details_window.destroy).pack(pady=15)
+
+    def delete_record(self):
+        """Delete the selected maintenance record."""
+        selected_item = self.history_tree.selection()
+        if not selected_item:
+            messagebox.showinfo("Selection Required", "Please select a record to delete.")
+            return
+            
+        record_id = selected_item[0]
+        values = self.history_tree.item(record_id, "values")
+        
+        # Get record information for confirmation message
+        date = values[0]
+        tul_id = values[1]
+        asset_id = values[3]
+        wear = values[4]
+        
+        # Confirm deletion
+        confirm = messagebox.askyesno(
+            "Confirm Deletion",
+            f"Are you sure you want to delete this record?\n\n"
+            f"TUL: {tul_id}\n"
+            f"Asset: {asset_id}\n"
+            f"Date: {date}\n"
+            f"Wear: {wear}",
+            icon=messagebox.WARNING
+        )
+        
+        if confirm:
+            # Delete from database
+            success = self.db_manager.delete_measurement(int(record_id))
+            
+            if success:
+                # Remove from treeview
+                self.history_tree.delete(record_id)
+                self.status_var.set(f"Record deleted for {asset_id} on {date}")
+            else:
+                messagebox.showerror("Database Error", "Failed to delete record from database.")
+
+
+================================================================================
+FILE: ui/prediction_tab.py
+================================================================================
+import tkinter as tk
+from tkinter import ttk, messagebox
+from datetime import datetime, timedelta
+import numpy as np
+import matplotlib
+matplotlib.use('TkAgg')
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+
+class PredictionTab:
+    """Implements the Prediction tab functionality for the expanded asset system."""
+    
+    def __init__(self, parent, db_manager, prediction_model, status_var):
+        self.parent = parent
+        self.db_manager = db_manager
+        self.status_var = status_var
+        self.prediction_model = prediction_model
+        
+        # Variables for prediction controls
+        self.tul_var = tk.StringVar()
+        self.asset_type_var = tk.StringVar()
+        self.asset_var = tk.StringVar()
+        self.days_ahead_var = tk.IntVar(value=90)
+        self.threshold_var = tk.DoubleVar(value=60.0)
+        self.invert_y_var = tk.BooleanVar(value=True)  # Default to inverted Y-axis
+        
+        # Create the UI
+        self.setup_ui()
+        
+    def setup_ui(self):
+        """Set up a simplified user interface for the prediction tab."""
+        # Create main layout with control panel on left, results on right
+        left_frame = ttk.Frame(self.parent, padding="10")
+        left_frame.pack(side=tk.LEFT, fill=tk.Y, padx=5, pady=5)
+        
+        right_frame = ttk.Frame(self.parent, padding="10")
+        right_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=5, pady=5)
+        
+        # Left frame - Prediction Controls
+        ttk.Label(left_frame, text="Wear Prediction", style="Title.TLabel").pack(anchor=tk.W, pady=5)
+        ttk.Separator(left_frame, orient=tk.HORIZONTAL).pack(fill=tk.X, pady=5)
+        
+        # Control section
+        control_frame = ttk.LabelFrame(left_frame, text="Prediction Controls")
+        control_frame.pack(fill=tk.X, padx=5, pady=5)
+        
+        # Asset selection
+        ttk.Label(control_frame, text="TUL:").grid(row=0, column=0, sticky=tk.W, padx=5, pady=5)
+        self.tul_combo = ttk.Combobox(control_frame, textvariable=self.tul_var, width=15, state="readonly")
+        self.tul_combo.grid(row=0, column=1, padx=5, pady=5)
+        self.tul_combo.bind("<<ComboboxSelected>>", self.on_tul_selected)
+        
+        ttk.Label(control_frame, text="Asset Type:").grid(row=1, column=0, sticky=tk.W, padx=5, pady=5)
+        self.asset_type_combo = ttk.Combobox(control_frame, textvariable=self.asset_type_var, width=15, state="readonly")
+        self.asset_type_combo.grid(row=1, column=1, padx=5, pady=5)
+        self.asset_type_combo.bind("<<ComboboxSelected>>", self.on_asset_type_selected)
+        
+        ttk.Label(control_frame, text="Asset:").grid(row=2, column=0, sticky=tk.W, padx=5, pady=5)
+        self.asset_combo = ttk.Combobox(control_frame, textvariable=self.asset_var, width=15, state="readonly")
+        self.asset_combo.grid(row=2, column=1, padx=5, pady=5)
+        
+# Prediction parameters
+        ttk.Label(control_frame, text="Predict Days Ahead:").grid(row=3, column=0, sticky=tk.W, padx=5, pady=5)
+        ttk.Spinbox(control_frame, from_=30, to=365, increment=30, textvariable=self.days_ahead_var, width=10).grid(row=3, column=1, padx=5, pady=5)
+        
+        # Get threshold for the selected asset type or use default
+        ttk.Label(control_frame, text="Wear Threshold (mm):").grid(row=4, column=0, sticky=tk.W, padx=5, pady=5)
+        threshold_spinbox = ttk.Spinbox(control_frame, from_=0.1, to=100.0, increment=0.5, textvariable=self.threshold_var, width=10)
+        threshold_spinbox.grid(row=4, column=1, padx=5, pady=5)
+        
+        # Display options
+        ttk.Checkbutton(control_frame, text="Invert Y-Axis (Show Wear Downward)", 
+                       variable=self.invert_y_var).grid(row=5, column=0, columnspan=2, sticky=tk.W, padx=5, pady=5)
+        
+        # Action buttons
+        button_frame = ttk.Frame(left_frame)
+        button_frame.pack(fill=tk.X, pady=10)
+        
+        ttk.Button(button_frame, text="Generate Prediction", command=self.generate_prediction).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="Show Maintenance Date", command=self.show_maintenance_date).pack(side=tk.LEFT, padx=5)
+        
+        # Right frame - Results display with tabs
+        results_notebook = ttk.Notebook(right_frame)
+        results_notebook.pack(fill=tk.BOTH, expand=True)
+        
+        # Text Results Tab
+        self.text_tab = ttk.Frame(results_notebook)
+        results_notebook.add(self.text_tab, text="Results")
+        
+        self.result_text = tk.Text(self.text_tab, wrap=tk.WORD, width=50, height=15)
+        self.result_text.pack(fill=tk.BOTH, expand=True, pady=5, padx=5)
+        
+        # Graph Tab
+        self.graph_tab = ttk.Frame(results_notebook)
+        results_notebook.add(self.graph_tab, text="Graph")
+        
+        self.graph_frame = ttk.Frame(self.graph_tab)
+        self.graph_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # Default message in graph frame
+        ttk.Label(self.graph_frame, text="Select an asset and click 'Generate Prediction'\nto display the wear chart.", 
+                  font=('Arial', 11), foreground='gray').pack(pady=50)
+        
+        # Load the initial data
+        self.load_tuls()
+        self.load_asset_types()
+        
+    def load_tuls(self):
+        """Load TUL data for dropdowns."""
+        tuls = self.db_manager.get_tuls()
+        tul_ids = [row[0] for row in tuls]
+        
+        self.tul_combo['values'] = tul_ids
+        if tul_ids and not self.tul_var.get():
+            self.tul_combo.current(0)
+            
+    def load_asset_types(self):
+        """Load asset type data for dropdowns."""
+        asset_types = self.db_manager.get_asset_types()
+        asset_type_ids = [row[0] for row in asset_types]
+        
+        self.asset_type_combo['values'] = asset_type_ids
+        if asset_type_ids and not self.asset_type_var.get():
+            self.asset_type_combo.current(0)
+            self.update_threshold()
+    
+    def update_threshold(self):
+        """Update the threshold value based on the selected asset type."""
+        asset_type_id = self.asset_type_var.get()
+        if not asset_type_id:
+            return
+            
+        # Get asset type details to find the default threshold
+        asset_types = self.db_manager.get_asset_types()
+        for asset_type in asset_types:
+            if asset_type[0] == asset_type_id:
+                self.threshold_var.set(asset_type[3])  # Set to WearThreshold value
+                break
+                
+    def on_tul_selected(self, event=None):
+        """Handle TUL selection to update asset list."""
+        tul_id = self.tul_var.get()
+        asset_type_id = self.asset_type_var.get()
+        
+        if tul_id:
+            self.update_asset_list(tul_id, asset_type_id)
+    
+    def on_asset_type_selected(self, event=None):
+        """Handle asset type selection to update asset list and threshold."""
+        tul_id = self.tul_var.get()
+        asset_type_id = self.asset_type_var.get()
+        
+        if asset_type_id:
+            self.update_asset_list(tul_id, asset_type_id)
+            self.update_threshold()
+    
+    def update_asset_list(self, tul_id=None, asset_type_id=None):
+        """Update the asset dropdown based on selected TUL and/or asset type."""
+        assets = self.db_manager.get_assets(tul_id=tul_id, asset_type_id=asset_type_id)
+        asset_ids = [asset[0] for asset in assets]
+        
+        self.asset_combo['values'] = asset_ids
+        if asset_ids:
+            self.asset_combo.current(0)
+        else:
+            self.asset_var.set("")
+    
+    def generate_prediction(self):
+        """Generate wear prediction for the selected asset."""
+        asset_id = self.asset_var.get()
+        if not asset_id:
+            messagebox.showerror("Selection Error", "Please select an asset.")
+            return
+            
+        # Get the measurement data
+        measurements = self.db_manager.get_measurements(asset_id=asset_id)
+        if len(measurements) < 3:
+            messagebox.showerror("Data Error", 
+                f"Not enough measurements for asset {asset_id}. Need at least 3 data points.")
+            return
+            
+        # Get asset and type details for display
+        assets = self.db_manager.get_assets()
+        asset_details = None
+        for asset in assets:
+            if asset[0] == asset_id:
+                asset_details = asset
+                break
+                
+        if not asset_details:
+            messagebox.showerror("Data Error", f"Could not find details for asset {asset_id}.")
+            return
+            
+        tul_id = asset_details[1]
+        asset_type_id = asset_details[2]
+        instance_num = asset_details[3]
+        
+        # Process measurement data for modeling
+        dates = []
+        wear_values = []
+        
+        # Convert to datetime and prepare for model
+        for m in measurements:
+            date_str = m[2]
+            try:
+                date = datetime.strptime(date_str, '%Y-%m-%d').date()
+                dates.append(date)
+                wear_values.append(float(m[3]))  # Wear value
+            except ValueError:
+                continue
+        
+        if len(dates) < 3:
+            messagebox.showerror("Data Error", 
+                f"Not enough valid measurements for asset {asset_id}. Need at least 3 data points.")
+            return
+            
+        # Convert dates to days since start
+        start_date = min(dates)
+        days_since_start = [(date - start_date).days for date in dates]
+        
+        # Remove duplicates and handle maintenance events
+        unique_days_dict = {}
+        for i, day in enumerate(days_since_start):
+            # Keep the latest measurement for each day
+            unique_days_dict[day] = wear_values[i]
+        
+        clean_days = list(unique_days_dict.keys())
+        clean_wear = list(unique_days_dict.values())
+        
+        # Sort by days
+        sorted_indices = sorted(range(len(clean_days)), key=lambda i: clean_days[i])
+        clean_days = [clean_days[i] for i in sorted_indices]
+        clean_wear = [clean_wear[i] for i in sorted_indices]
+        
+        # Look for maintenance events (significant drops in wear)
+        segments = [[]]
+        segment_days = [[]]
+        current_segment = 0
+        
+        for i in range(len(clean_days)):
+            # If this is not the first point and there's a significant drop in wear
+            if i > 0 and clean_wear[i] < clean_wear[i-1] * 0.5:  # Drop of more than 50%
+                # Start a new segment
+                current_segment += 1
+                segments.append([])
+                segment_days.append([])
+            
+            segments[current_segment].append(clean_wear[i])
+            segment_days[current_segment].append(clean_days[i])
+        
+        # Use the last segment for prediction
+        if segments and len(segment_days[-1]) >= 3:
+            prediction_days = segment_days[-1]
+            prediction_wear = segments[-1]
+            
+            # Try different polynomial degrees
+            best_degree = 1
+            best_r2 = -float('inf')
+            
+            for degree in range(1, min(4, len(prediction_days))):
+                temp_model = type(self.prediction_model)(degree=degree)
+                success, _ = temp_model.fit(prediction_days, prediction_wear)
+                
+                if success:
+                    # Predict using the model
+                    pred, _ = temp_model.predict(prediction_days)
+                    
+                    # Calculate R²
+                    mean_wear = sum(prediction_wear) / len(prediction_wear)
+                    ss_total = sum((y - mean_wear) ** 2 for y in prediction_wear)
+                    ss_residual = sum((y - p) ** 2 for y, p in zip(prediction_wear, pred))
+                    r2 = 1 - (ss_residual / ss_total if ss_total > 0 else 0)
+                    
+                    if r2 > best_r2:
+                        best_r2 = r2
+                        best_degree = degree
+            
+            # Train with best degree
+            self.prediction_model = type(self.prediction_model)(degree=best_degree)
+            success, message = self.prediction_model.fit(prediction_days, prediction_wear)
+            
+            if not success:
+                messagebox.showerror("Model Error", f"Failed to train model: {message}")
+                return
+        else:
+            # Fall back to all data if no valid segments
+            success, message = self.prediction_model.fit(days_since_start, wear_values)
+            
+            if not success:
+                messagebox.showerror("Model Error", f"Failed to train model: {message}")
+                return
+        
+        # Get the threshold value
+        threshold = self.threshold_var.get()
+        
+        # Generate prediction
+        days_ahead = self.days_ahead_var.get()
+        last_day = max(days_since_start)
+        future_days = list(range(last_day + 1, last_day + days_ahead + 1))
+        predictions, _ = self.prediction_model.predict(future_days)
+        
+        # Calculate threshold crossing
+        crossing_date, days_until = self.prediction_model.calculate_threshold_crossing(
+            start_day=last_day,
+            days_ahead=days_ahead,
+            start_date=dates[-1],
+            threshold=threshold
+        )
+        
+        # Clear previous results
+        self.result_text.delete(1.0, tk.END)
+        
+        # Update result text
+        result_text = f"Prediction for {asset_id}:\n\n"
+        result_text += f"TUL: {tul_id}\n"
+        result_text += f"Asset Type: {asset_type_id}\n"
+        result_text += f"Number of measurements: {len(dates)}\n"
+        result_text += f"Date range: {min(dates)} to {max(dates)}\n"
+        result_text += f"Current wear: {wear_values[-1]:.2f} mm\n\n"
+        result_text += f"Predicted wear in {days_ahead} days:\n"
+        
+        # Show a few prediction points
+        for i, day in enumerate(future_days):
+            if i % 10 == 0 or i == len(future_days) - 1:  # Show every 10th day and the last day
+                future_date = dates[-1] + timedelta(days=day - last_day)
+                result_text += f"{future_date}: {predictions[i]:.2f} mm\n"
+        
+        result_text += f"\nMaintenance threshold: {threshold:.1f} mm\n"
+        
+        if crossing_date:
+            days_text = "day" if days_until == 1 else "days"
+            result_text += f"Will be reached in {days_until} {days_text}\n"
+            result_text += f"Estimated date: {crossing_date.strftime('%Y-%m-%d')}"
+        else:
+            result_text += f"Will not be reached within {days_ahead} days"
+        
+        self.result_text.insert(tk.END, result_text)
+        
+        # Generate and display the plot
+        self.generate_plot(asset_id, tul_id, asset_type_id, dates, wear_values, future_days, predictions, threshold, crossing_date)
+        
+        self.status_var.set(f"Prediction generated for {asset_id}")
+        
+    def show_maintenance_date(self):
+        """Calculate and display the estimated maintenance date."""
+        asset_id = self.asset_var.get()
+        if not asset_id:
+            messagebox.showerror("Selection Error", "Please select an asset.")
+            return
+            
+        # Check if model has been trained
+        if self.prediction_model.model is None:
+            # Generate prediction first
+            self.generate_prediction()
+            return
+            
+        # Get threshold value
+        threshold = self.threshold_var.get()
+        
+        # Get the last measurement date and wear value
+        measurements = self.db_manager.get_measurements(asset_id=asset_id)
+        if not measurements:
+            messagebox.showerror("Data Error", f"No data found for asset {asset_id}.")
+            return
+            
+        # Sort measurements by date
+        sorted_measurements = sorted(measurements, key=lambda m: datetime.strptime(m[2], '%Y-%m-%d'))
+        
+        # Get first and last measurement
+        first_date = datetime.strptime(sorted_measurements[0][2], '%Y-%m-%d').date()
+        last_date = datetime.strptime(sorted_measurements[-1][2], '%Y-%m-%d').date()
+        last_wear = float(sorted_measurements[-1][3])
+        
+        # Calculate days since start
+        last_day = (last_date - first_date).days
+        
+        # Calculate maintenance date using extended prediction horizon
+        crossing_date, days_until = self.prediction_model.calculate_threshold_crossing(
+            start_day=last_day,
+            days_ahead=365,  # Look ahead a full year
+            start_date=last_date,
+            threshold=threshold
+        )
+        
+        if crossing_date:
+            # Show maintenance date dialog
+            days_text = "day" if days_until == 1 else "days"
+            maintenance_info = (
+                f"Maintenance for {asset_id}\n\n"
+                f"Current wear: {last_wear:.2f} mm\n"
+                f"Threshold: {threshold:.1f} mm\n\n"
+                f"Estimated maintenance date:\n{crossing_date.strftime('%Y-%m-%d')}\n"
+                f"({days_until} {days_text} from last measurement)"
+            )
+            messagebox.showinfo("Maintenance Date", maintenance_info)
+        else:
+            messagebox.showinfo("Maintenance Date", 
+                f"The maintenance threshold ({threshold:.1f} mm) will not be reached within the next 365 days.")
+
+    def generate_plot(self, asset_id, tul_id, asset_type_id, dates, wear_values, future_days, predictions, threshold, crossing_date):
+        """Generate and display a plot with actual measurements and predictions."""
+        try:
+            # Clear previous content
+            for widget in self.graph_frame.winfo_children():
+                widget.destroy()
+            
+            # Create figure and axis
+            fig, ax = plt.subplots(figsize=(8, 5))
+            
+            # Convert future days to dates
+            last_date = dates[-1]
+            future_dates = [last_date + timedelta(days=day - (dates[-1] - dates[0]).days) for day in future_days]
+            
+            # Plot historical data
+            ax.scatter(dates, wear_values, color='blue', label='Actual Measurements')
+            ax.plot(dates, wear_values, 'b-', alpha=0.5)
+            
+            # Plot prediction
+            ax.plot(future_dates, predictions, 'g--', label='Predicted Wear')
+            
+            # Add maintenance threshold line
+            ax.axhline(y=threshold, color='red', linestyle='--', 
+                      label=f'Maintenance Threshold ({threshold} mm)')
+            
+            # Mark crossing date if exists
+            if crossing_date:
+                ax.axvline(x=crossing_date, color='orange', linestyle='-.',
+                          label=f'Threshold Reached ({crossing_date.strftime("%Y-%m-%d")})')
+                
+                # Add annotation
+                ax.annotate(f"Maintenance\nNeeded", 
+                           xy=(crossing_date, threshold),
+                           xytext=(10, -20), textcoords="offset points",
+                           arrowprops=dict(arrowstyle="->", color='orange'),
+                           bbox=dict(boxstyle="round,pad=0.3", fc="yellow", alpha=0.7))
+            
+            # Invert Y-axis if requested (so wear increases downward)
+            if self.invert_y_var.get():
+                ax.invert_yaxis()
+            
+            # Set labels and title
+            ax.set_title(f'Wear Prediction for {asset_id} ({tul_id}, {asset_type_id})')
+            ax.set_xlabel('Date')
+            ax.set_ylabel('Wear (mm)')
+            
+            # Add grid and legend
+            ax.grid(True, alpha=0.3)
+            ax.legend()
+            
+            # Format dates on x-axis
+            fig.autofmt_xdate()
+            
+            # Create canvas
+            canvas = FigureCanvasTkAgg(fig, master=self.graph_frame)
+            canvas.draw()
+            canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+            
+        except Exception as e:
+            ttk.Label(self.graph_frame, text=f"Error creating plot: {str(e)}").pack(pady=20)
+            self.status_var.set(f"Error creating plot: {str(e)}")
+
+
+================================================================================
+FILE: ui/tul_tab.py
+================================================================================
+import tkinter as tk
+from tkinter import ttk, messagebox
+from datetime import datetime
+
+class TULManagementTab:
+    """Implements the TUL Management tab functionality."""
+    
+    def __init__(self, parent, db_manager, status_var):
+        self.parent = parent
+        self.db_manager = db_manager
+        self.status_var = status_var
+        
+        # Variables for TUL form
+        self.tul_id_var = tk.StringVar()
+        self.location_var = tk.StringVar()
+        self.installation_date_var = tk.StringVar(value=datetime.now().strftime('%Y-%m-%d'))
+        self.notes_var = tk.StringVar()
+        
+        self.setup_ui()
+        
+    def setup_ui(self):
+        """Set up the user interface for the TUL Management tab."""
+        # Create main layout: left panel for input, right panel for display
+        left_frame = ttk.Frame(self.parent, padding="10")
+        left_frame.pack(side=tk.LEFT, fill=tk.Y, padx=5, pady=5)
+        
+        right_frame = ttk.Frame(self.parent, padding="10")
+        right_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=5, pady=5)
+        
+        # Left frame - TUL Management Controls
+        ttk.Label(left_frame, text="TUL Management", style="Title.TLabel").pack(anchor=tk.W, pady=5)
+        ttk.Separator(left_frame, orient=tk.HORIZONTAL).pack(fill=tk.X, pady=5)
+        
+        # TUL Management Section
+        tul_frame = ttk.LabelFrame(left_frame, text="Add New TUL")
+        tul_frame.pack(fill=tk.X, padx=5, pady=5)
+        
+        ttk.Label(tul_frame, text="TUL ID:").grid(row=0, column=0, sticky=tk.W, padx=5, pady=2)
+        ttk.Entry(tul_frame, textvariable=self.tul_id_var, width=20).grid(row=0, column=1, padx=5, pady=2)
+        
+        ttk.Label(tul_frame, text="Location:").grid(row=1, column=0, sticky=tk.W, padx=5, pady=2)
+        ttk.Entry(tul_frame, textvariable=self.location_var, width=20).grid(row=1, column=1, padx=5, pady=2)
+        
+        ttk.Label(tul_frame, text="Installation Date:").grid(row=2, column=0, sticky=tk.W, padx=5, pady=2)
+        ttk.Entry(tul_frame, textvariable=self.installation_date_var, width=20).grid(row=2, column=1, padx=5, pady=2)
+        
+        ttk.Label(tul_frame, text="Notes:").grid(row=3, column=0, sticky=tk.W, padx=5, pady=2)
+        ttk.Entry(tul_frame, textvariable=self.notes_var, width=20).grid(row=3, column=1, padx=5, pady=2)
+        
+        button_frame = ttk.Frame(tul_frame)
+        button_frame.grid(row=4, column=0, columnspan=2, pady=5)
+        
+        ttk.Button(button_frame, text="Add TUL", command=self.add_tul).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="Clear Form", command=self.clear_tul_form).pack(side=tk.LEFT, padx=5)
+        
+        # Right frame - TUL Display
+        ttk.Label(right_frame, text="TUL List", style="Title.TLabel").pack(anchor=tk.W, pady=5)
+        
+        # Add refresh button
+        refresh_frame = ttk.Frame(right_frame)
+        refresh_frame.pack(fill=tk.X, pady=5)
+        
+        ttk.Button(refresh_frame, text="Refresh List", command=self.load_tuls).pack(side=tk.RIGHT)
+        
+        # Create Treeview for TULs
+        self.tree_frame = ttk.Frame(right_frame)
+        self.tree_frame.pack(fill=tk.BOTH, expand=True, pady=5)
+        
+        columns = ("id", "location", "installation_date", "notes")
+        self.tree = ttk.Treeview(self.tree_frame, columns=columns, show="headings")
+        
+        # Define column headings
+        self.tree.heading("id", text="TUL ID")
+        self.tree.heading("location", text="Location")
+        self.tree.heading("installation_date", text="Installation Date")
+        self.tree.heading("notes", text="Notes")
+        
+        # Define column widths
+        self.tree.column("id", width=100)
+        self.tree.column("location", width=150)
+        self.tree.column("installation_date", width=120)
+        self.tree.column("notes", width=200)
+        
+        # Add scrollbar
+        scrollbar = ttk.Scrollbar(self.tree_frame, orient=tk.VERTICAL, command=self.tree.yview)
+        self.tree.configure(yscrollcommand=scrollbar.set)
+        
+        self.tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        # Actions section
+        actions_frame = ttk.Frame(right_frame)
+        actions_frame.pack(fill=tk.X, pady=5)
+        
+        ttk.Button(actions_frame, text="View Assets", command=self.view_tul_assets).pack(side=tk.LEFT, padx=5)
+        ttk.Button(actions_frame, text="Delete TUL", style="Delete.TButton", command=self.delete_tul).pack(side=tk.LEFT, padx=5)
+        
+        # Load initial data
+        self.load_tuls()
+        
+    def add_tul(self):
+        """Add a new TUL to the database."""
+        tul_id = self.tul_id_var.get().strip()
+        location = self.location_var.get().strip()
+        date_str = self.installation_date_var.get().strip()
+        notes = self.notes_var.get().strip()
+        
+        if not tul_id:
+            messagebox.showerror("Input Error", "TUL ID is required.")
+            return
+            
+        try:
+            installation_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+        except ValueError:
+            messagebox.showerror("Input Error", "Invalid date format. Use YYYY-MM-DD.")
+            return
+            
+        success = self.db_manager.add_tul(tul_id, location, installation_date, notes)
+        
+        if success:
+            self.status_var.set(f"TUL {tul_id} added successfully.")
+            self.clear_tul_form()
+            self.load_tuls()
+        else:
+            messagebox.showerror("Database Error", "Failed to add TUL. It may already exist.")
+            
+    def clear_tul_form(self):
+        """Clear the TUL form fields."""
+        self.tul_id_var.set("")
+        self.location_var.set("")
+        self.installation_date_var.set(datetime.now().strftime('%Y-%m-%d'))
+        self.notes_var.set("")
+        
+    def load_tuls(self):
+        """Load and display all TULs."""
+        # Clear the existing treeview
+        for item in self.tree.get_children():
+            self.tree.delete(item)
+            
+        # Get all TULs
+        tuls = self.db_manager.get_tuls()
+        
+        if not tuls:
+            self.status_var.set("No TULs found in the database.")
+            return
+            
+        # Add each TUL to the treeview
+        for tul in tuls:
+            tul_id, location, installation_date, notes = tul
+            self.tree.insert("", tk.END, values=(tul_id, location, installation_date, notes))
+            
+        self.status_var.set(f"Loaded {len(tuls)} TULs.")
+        
+    def view_tul_assets(self):
+        """View assets for the selected TUL."""
+        selected_items = self.tree.selection()
+        if not selected_items:
+            messagebox.showerror("Selection Error", "Please select a TUL to view its assets.")
+            return
+            
+        # Get the selected TUL ID
+        tul_id = self.tree.item(selected_items[0], "values")[0]
+        
+        # This would typically switch to the Asset tab and filter by TUL
+        # For now, we'll just show a message
+        messagebox.showinfo("View Assets", f"Viewing assets for TUL: {tul_id}")
+        
+    def delete_tul(self):
+        """Delete the selected TUL after confirmation."""
+        selected_items = self.tree.selection()
+        if not selected_items:
+            messagebox.showerror("Selection Error", "Please select a TUL to delete.")
+            return
+            
+        # Get the selected TUL ID
+        tul_id = self.tree.item(selected_items[0], "values")[0]
+        
+        # Create a custom confirmation dialog
+        confirm_dialog = tk.Toplevel(self.parent)
+        confirm_dialog.title("Confirm Deletion")
+        confirm_dialog.geometry("400x200")
+        confirm_dialog.transient(self.parent)
+        confirm_dialog.grab_set()
+        confirm_dialog.resizable(False, False)
+        
+        # Dialog content
+        frame = ttk.Frame(confirm_dialog, padding="20")
+        frame.pack(fill=tk.BOTH, expand=True)
+        
+        warning_text = (
+            f"Are you sure you want to delete '{tul_id}'?\n\n"
+            f"You will lose ALL assets and measurement data for this TUL.\n\n"
+            f"Type 'DELETE' to confirm:"
+        )
+        
+        ttk.Label(frame, text=warning_text, wraplength=350).pack(pady=(0, 10))
+        
+        # Entry for confirmation text
+        confirmation_var = tk.StringVar()
+        confirmation_entry = ttk.Entry(frame, textvariable=confirmation_var, width=20)
+        confirmation_entry.pack(pady=5)
+        confirmation_entry.focus_set()
+        
+        # Buttons
+        button_frame = ttk.Frame(frame)
+        button_frame.pack(pady=10)
+        
+        def confirm_delete():
+            if confirmation_var.get() == "DELETE":
+                # TODO: Implement actual deletion in DatabaseManager
+                # For now, just close the dialog and refresh
+                confirm_dialog.destroy()
+                self.load_tuls()
+                self.status_var.set(f"TUL '{tul_id}' deleted successfully.")
+            else:
+                messagebox.showerror("Confirmation Error", 
+                                   "Incorrect confirmation text. Type 'DELETE' exactly.")
+        
+        ttk.Button(button_frame, text="Delete", command=confirm_delete, style="Delete.TButton").pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="Cancel", command=confirm_dialog.destroy).pack(side=tk.LEFT, padx=5)
+        
+        # Handle Enter key in entry field
+        confirmation_entry.bind("<Return>", lambda event: confirm_delete())
+
+
+================================================================================
+FILE: utils/__init__.py
+================================================================================
+
+
